@@ -3,6 +3,7 @@ const cors = require('cors')
 require('dotenv').config()
 const connectDB = require('./config/db')
 const authRoutes = require('./routes/authRoutes')
+const taskRoutes = require('./routes/taskRoutes')
 
 connectDB()
 
@@ -15,6 +16,7 @@ app.get('/', (req, res) => {
 })
 
 app.use('/api/auth', authRoutes)
+app.use('/api/tasks', taskRoutes)
 
 app.use((err, req, res, next) => {
   console.error('ERROR:', err.stack)
