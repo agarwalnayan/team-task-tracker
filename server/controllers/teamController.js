@@ -2,12 +2,24 @@ const Team = require('../models/Team')
 const User = require('../models/User')
 
 const createTeam = async (req, res) => {
-  const { name, description } = req.body
+  const { name, description, company } = req.body
 
   try {
+    const teamCompany =
+      (company && String(company).trim()) ||
+      (req.user.company && String(req.user.company).trim()) ||
+      undefined
+
+    if (req.user.company && teamCompany && teamCompany !== req.user.company) {
+      return res.status(400).json({
+        message: 'Team company must match your profile company'
+      })
+    }
+
     const team = await Team.create({
       name,
       description,
+      company: teamCompany,
       createdBy: req.user._id,
       members: [
         {
@@ -17,7 +29,11 @@ const createTeam = async (req, res) => {
       ]
     })
 
-    res.status(201).json(team)
+    const populated = await Team.findById(team._id)
+      .populate('createdBy', 'name email company')
+      .populate('members.user', 'name email company')
+
+    res.status(201).json(populated)
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
@@ -28,8 +44,8 @@ const getMyTeams = async (req, res) => {
     const teams = await Team.find({
       'members.user': req.user._id
     })
-      .populate('createdBy', 'name email')
-      .populate('members.user', 'name email')
+      .populate('createdBy', 'name email company')
+      .populate('members.user', 'name email company')
 
     res.json(teams)
   } catch (error) {
@@ -40,8 +56,8 @@ const getMyTeams = async (req, res) => {
 const getTeamById = async (req, res) => {
   try {
     const team = await Team.findById(req.params.id)
-      .populate('createdBy', 'name email')
-      .populate('members.user', 'name email')
+      .populate('createdBy', 'name email company')
+      .populate('members.user', 'name email company')
 
     if (!team) {
       return res.status(404).json({ message: 'Team not found' })
@@ -85,6 +101,16 @@ const addMember = async (req, res) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
+    if (
+      team.company &&
+      userToAdd.company &&
+      team.company !== userToAdd.company
+    ) {
+      return res.status(400).json({
+        message: 'That user belongs to a different company than this team'
+      })
+    }
+
     const alreadyMember = team.members.some(
       m => m.user.toString() === userToAdd._id.toString()
     )
@@ -99,7 +125,10 @@ const addMember = async (req, res) => {
     })
 
     await team.save()
-    res.json(team)
+    const populated = await Team.findById(team._id)
+      .populate('createdBy', 'name email company')
+      .populate('members.user', 'name email company')
+    res.json(populated)
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
@@ -126,7 +155,10 @@ const removeMember = async (req, res) => {
     )
 
     await team.save()
-    res.json(team)
+    const populated = await Team.findById(team._id)
+      .populate('createdBy', 'name email company')
+      .populate('members.user', 'name email company')
+    res.json(populated)
   } catch (error) {
     res.status(500).json({ message: error.message })
   }

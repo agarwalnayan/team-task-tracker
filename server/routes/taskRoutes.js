@@ -1,7 +1,8 @@
 const express = require('express')
 const router = express.Router()
-const {createTask,getTasks,getTaskById,updateTask,deleteTask,addComment} = require('../controllers/taskController')
+const {createTask,getTasks,getTaskById,updateTask,deleteTask,addComment,uploadAttachment} = require('../controllers/taskController')
 const { protect } = require('../middleware/authMiddleware')
+const upload = require('../config/multer')
 
 router.use(protect)
 
@@ -15,5 +16,7 @@ router.route('/:id')
   .delete(deleteTask)
 
 router.post('/:id/comments', addComment)
+
+router.post('/:id/upload', upload.single('file'), uploadAttachment)
 
 module.exports = router

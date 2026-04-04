@@ -10,6 +10,10 @@ const teamSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  company: {
+    type: String,
+    trim: true
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

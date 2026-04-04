@@ -24,15 +24,34 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password })
+    const { data } = await api.post('/auth/login', {
+      email: String(email || '').trim().toLowerCase(),
+      password
+    })
     localStorage.setItem('token', data.token)
-    setUser({ _id: data._id, name: data.name, email: data.email })
+    setUser({
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      company: data.company
+    })
   }
 
-  const register = async (name, email, password) => {
-    const { data } = await api.post('/auth/register', { name, email, password })
+  const register = async (name, email, password, company) => {
+    const body = {
+      name: String(name).trim(),
+      email: String(email || '').trim().toLowerCase(),
+      password
+    }
+    if (company && String(company).trim()) body.company = String(company).trim()
+    const { data } = await api.post('/auth/register', body)
     localStorage.setItem('token', data.token)
-    setUser({ _id: data._id, name: data.name, email: data.email })
+    setUser({
+      _id: data._id,
+      name: data.name,
+      email: data.email,
+      company: data.company
+    })
   }
 
   const logout = () => {
@@ -40,8 +59,19 @@ export const AuthProvider = ({ children }) => {
     setUser(null)
   }
 
+  const updateProfile = async (payload) => {
+    const { data } = await api.patch('/auth/me', payload)
+    setUser(data)
+  }
+
+  const updatePassword = async (currentPassword, newPassword) => {
+    await api.patch('/auth/me/password', { currentPassword, newPassword })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, register, logout, updateProfile, updatePassword }}
+    >
       {children}
     </AuthContext.Provider>
   )
