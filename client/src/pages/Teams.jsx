@@ -30,7 +30,7 @@ export default function Teams({ dark, setDark }) {
 
   const fetchTeams = async () => {
     try {
-      const res = await api.get('/teams')
+      const res = await api.get('/api/teams')
       setTeams(res.data)
     } catch {
       setError('Failed to load teams')
@@ -52,7 +52,7 @@ export default function Teams({ dark, setDark }) {
       const payload = { name: teamName.trim(), description: teamDescription.trim() || undefined }
       const c = teamCompany.trim()
       if (c) payload.company = c
-      await api.post('/teams', payload)
+      await api.post('/api/teams', payload)
       setTeamName('')
       setTeamDescription('')
       setTeamCompany('')
@@ -70,7 +70,7 @@ export default function Teams({ dark, setDark }) {
     setInviteBusy((b) => ({ ...b, [teamId]: true }))
     setError('')
     try {
-      await api.post(`/teams/${teamId}/members`, { email })
+      await api.post(`/api/teams/${teamId}/members`, { email })
       setInviteEmail((m) => ({ ...m, [teamId]: '' }))
       fetchTeams()
     } catch (err) {
@@ -84,7 +84,7 @@ export default function Teams({ dark, setDark }) {
     if (!window.confirm('Remove this member from the team?')) return
     setError('')
     try {
-      await api.delete(`/teams/${teamId}/members/${memberUserId}`)
+      await api.delete(`/api/teams/${teamId}/members/${memberUserId}`)
       fetchTeams()
     } catch (err) {
       setError(err.response?.data?.message || 'Could not remove member')

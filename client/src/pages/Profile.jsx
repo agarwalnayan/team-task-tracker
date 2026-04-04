@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '../components/AppLayout'
 import { useAuth } from '../context/AuthContext'
+import { validateAndFormatPhone, formatPhoneNumber } from '../utils/phoneValidation'
 
 const fieldClass =
   'w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-shadow'
@@ -10,8 +11,11 @@ export default function Profile({ dark, setDark }) {
   const { user, updateProfile, updatePassword } = useAuth()
   const [name, setName] = useState('')
   const [company, setCompany] = useState('')
+  const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState('US')
   const [profileMsg, setProfileMsg] = useState({ type: '', text: '' })
   const [profileSaving, setProfileSaving] = useState(false)
+  const [phoneError, setPhoneError] = useState('')
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -23,17 +27,43 @@ export default function Profile({ dark, setDark }) {
     if (user) {
       setName(user.name || '')
       setCompany(user.company || '')
+      setPhone(user.phone || '')
+      setPhoneCountry(user.phoneCountryCode || 'US')
     }
   }, [user])
+
+  const handlePhoneChange = (e) => {
+    const value = e.target.value
+    setPhone(value)
+    setPhoneError('')
+    
+    if (value) {
+      const validation = validateAndFormatPhone(value, phoneCountry)
+      if (!validation.isValid) {
+        setPhoneError(validation.error)
+      }
+    }
+  }
 
   const handleProfile = async (e) => {
     e.preventDefault()
     setProfileMsg({ type: '', text: '' })
+    
+    if (phone) {
+      const phoneValidation = validateAndFormatPhone(phone, phoneCountry)
+      if (!phoneValidation.isValid) {
+        setPhoneError(phoneValidation.error)
+        return
+      }
+    }
+    
     setProfileSaving(true)
     try {
       await updateProfile({
         name: name.trim(),
-        company: company.trim()
+        company: company.trim(),
+        phone: phone.trim() || undefined,
+        phoneCountryCode: phoneCountry
       })
       setProfileMsg({ type: 'ok', text: 'Profile saved successfully.' })
     } catch (err) {
@@ -99,6 +129,46 @@ export default function Profile({ dark, setDark }) {
               />
             </div>
             <div>
+              <label className={labelClass} htmlFor="profile-phone">
+                Phone number
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={phoneCountry}
+                  onChange={(e) => setPhoneCountry(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                >
+                  <option value="US">🇺🇸 US</option>
+                  <option value="IN">🇮🇳 India</option>
+                  <option value="GB">🇬🇧 UK</option>
+                  <option value="CA">🇨🇦 Canada</option>
+                  <option value="AU">🇦🇺 Australia</option>
+                  <option value="DE">🇩🇪 Germany</option>
+                  <option value="FR">🇫🇷 France</option>
+                  <option value="JP">🇯🇵 Japan</option>
+                  <option value="CN">🇨🇳 China</option>
+                  <option value="BR">🇧🇷 Brazil</option>
+                </select>
+                <input
+                  id="profile-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={handlePhoneChange}
+                  placeholder="+1 (555) 123-4567"
+                  className={`flex-1 px-4 py-2.5 rounded-xl border ${phoneError ? 'border-red-300 dark:border-red-600' : fieldClass.split('border-')[1]} bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-shadow`}
+                  autoComplete="tel"
+                />
+              </div>
+              {phoneError && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{phoneError}</p>
+              )}
+              {user?.phone && (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Current: {formatPhoneNumber(user.phone, user.phoneCountryCode)}
+                </p>
+              )}
+            </div>
+            <div>
               <label className={labelClass} htmlFor="profile-company">
                 Company / organization
               </label>
@@ -123,6 +193,16 @@ export default function Profile({ dark, setDark }) {
               <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                 Email sign-in cannot be changed here. Contact support if you need to move your account.
               </p>
+              {user?.emailVerified && (
+                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  ✓ Email verified
+                </p>
+              )}
+              {user?.phoneVerified && (
+                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  ✓ Phone verified
+                </p>
+              )}
             </div>
             {profileMsg.text && (
               <p
