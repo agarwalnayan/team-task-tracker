@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../utils/api'
+import { extractData } from '../utils/extractData'
 
 /** Unique users from teams you belong to (for task assignment). Skips teams in another company if your profile has a company set. */
 export function useTeamMembers() {
@@ -18,10 +19,10 @@ export function useTeamMembers() {
     let cancelled = false
     setLoading(true)
     api
-      .get('/teams')
+      .get('/api/teams')
       .then((res) => {
         const map = new Map()
-        for (const team of res.data || []) {
+        for (const team of extractData(res) || []) {
           if (
             user.company &&
             team.company &&

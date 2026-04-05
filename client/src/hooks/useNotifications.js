@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { useSocket } from './useSocket';
+import { extractData } from '../utils/extractData';
 
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState([]);
@@ -12,8 +13,8 @@ export const useNotifications = () => {
     try {
       setLoading(true);
       const response = await api.get('/api/notifications?limit=50');
-      setNotifications(response.data);
-      setUnreadCount(response.pagination.unreadCount);
+      setNotifications(extractData(response));
+      setUnreadCount(response.pagination?.unreadCount || 0);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {

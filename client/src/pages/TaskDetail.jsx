@@ -29,8 +29,8 @@ export default function TaskDetail({ dark, setDark }) {
   // ================= FETCH TASK =================
   const fetchTask = async () => {
     try {
-      const res = await api.get(`/api/tasks/${id}`)
-      setTask(res.data)
+      const data = await api.get(`/api/tasks/${id}`)
+      setTask(data)
     } catch {
       setError('Failed to fetch task')
     } finally {
@@ -51,12 +51,12 @@ export default function TaskDetail({ dark, setDark }) {
   const handleAssigneeChange = async (e) => {
     const value = e.target.value
     try {
-      const res = await api.put(`/api/tasks/${id}`, {
+      const data = await api.put(`/api/tasks/${id}`, {
         assignedTo: value === '' ? null : value
       })
-      setTask(res.data)
+      setTask(data)
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update assignee')
+      setError(err.message || 'Failed to update assignee')
     }
   }
 
@@ -70,7 +70,7 @@ export default function TaskDetail({ dark, setDark }) {
     formData.append('file', file)
 
     try {
-      await api.post(`/tasks/${id}/upload`, formData, {
+      await api.post(`/api/tasks/${id}/attachments`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
 
@@ -164,7 +164,7 @@ export default function TaskDetail({ dark, setDark }) {
         {/* ATTACHMENTS */}
         <section className={card}>
           <h3 className="font-semibold mb-4">Attachments</h3>
-
+          
           {task.attachments?.map((f, i) => (
             <a
               key={i}
@@ -177,18 +177,10 @@ export default function TaskDetail({ dark, setDark }) {
             </a>
           ))}
 
-          <form onSubmit={handleUpload} className="mt-4 flex gap-3">
-            <input
-              type="file"
-              onChange={(e) => setFile(e.target.files[0])}
-            />
-            <button
-              disabled={!file || uploading}
-              className="px-4 py-2 bg-blue-600 text-white rounded"
-            >
-              {uploading ? 'Uploading...' : 'Upload'}
-            </button>
-          </form>
+          {/* File upload temporarily disabled - server endpoint not available */}
+          <div className="mt-4 text-sm text-gray-500">
+            File upload feature temporarily unavailable
+          </div>
         </section>
 
         {/* COMMENTS (MERGED CLEANLY) */}

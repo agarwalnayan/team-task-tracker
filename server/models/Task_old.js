@@ -15,7 +15,7 @@ const taskSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['todo', 'inprogress', 'done'],
+    enum: ['todo', 'in-progress', 'completed', 'blocked'],
     default: 'todo'
   },
   priority: {
@@ -84,5 +84,13 @@ taskSchema.index({ team: 1, createdAt: -1 });
 taskSchema.index({ createdBy: 1, priority: 1 });
 taskSchema.index({ status: 1, dueDate: 1 });
 taskSchema.index({ title: 'text', description: 'text' });
+
+// Automatically set completedAt when status changes to completed
+taskSchema.pre('save', function(next) {
+  if (this.isModified('status') && this.status === 'completed' && !this.completedAt) {
+    this.completedAt = new Date();
+  }
+  next();
+});
 
 module.exports = mongoose.model('Task', taskSchema);

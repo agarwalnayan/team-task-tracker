@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
+import { extractData } from '../utils/extractData';
 
 export default function Comments({ taskId }) {
   const [comments, setComments] = useState([]);
@@ -17,7 +18,7 @@ export default function Comments({ taskId }) {
     try {
       setLoading(true);
       const response = await api.get(`/api/comments/task/${taskId}`);
-      setComments(response.data);
+      setComments(extractData(response));
     } catch (error) {
       console.error('Error fetching comments:', error);
     } finally {
@@ -33,7 +34,7 @@ export default function Comments({ taskId }) {
       const response = await api.post(`/api/comments/task/${taskId}`, {
         content: newComment
       });
-      setComments([response.data, ...comments]);
+      setComments([response, ...comments]);
       setNewComment('');
     } catch (error) {
       console.error('Error creating comment:', error);
@@ -79,7 +80,7 @@ export default function Comments({ taskId }) {
       </form>
 
       <div className="space-y-4">
-        {comments.map((comment) => (
+        {Array.isArray(comments) && comments.map((comment) => (
           <div key={comment._id} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-2">

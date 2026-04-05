@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import AppLayout from '../components/AppLayout'
 import api from '../utils/api'
+import { extractData } from '../utils/extractData'
 
 const input =
   'w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500'
@@ -31,7 +32,7 @@ export default function Teams({ dark, setDark }) {
   const fetchTeams = async () => {
     try {
       const res = await api.get('/api/teams')
-      setTeams(res.data)
+      setTeams(extractData(res))
     } catch {
       setError('Failed to load teams')
     } finally {
@@ -58,7 +59,7 @@ export default function Teams({ dark, setDark }) {
       setTeamCompany('')
       fetchTeams()
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not create team')
+      setError(err.message || 'Could not create team')
     } finally {
       setCreating(false)
     }
@@ -74,7 +75,7 @@ export default function Teams({ dark, setDark }) {
       setInviteEmail((m) => ({ ...m, [teamId]: '' }))
       fetchTeams()
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not add member')
+      setError(err.message || 'Could not add member')
     } finally {
       setInviteBusy((b) => ({ ...b, [teamId]: false }))
     }
@@ -87,7 +88,7 @@ export default function Teams({ dark, setDark }) {
       await api.delete(`/api/teams/${teamId}/members/${memberUserId}`)
       fetchTeams()
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not remove member')
+      setError(err.message || 'Could not remove member')
     }
   }
 
@@ -211,7 +212,7 @@ export default function Teams({ dark, setDark }) {
             </div>
           ) : (
             <ul className="space-y-5">
-              {teams.map((team) => (
+              {Array.isArray(teams) && teams.map((team) => (
                 <li
                   key={team._id}
                   className="rounded-2xl bg-white dark:bg-slate-900 ring-1 ring-slate-200/80 dark:ring-slate-800 shadow-sm overflow-hidden"

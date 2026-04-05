@@ -5,6 +5,7 @@ import { useTeamMembers } from '../hooks/useTeamMembers'
 import AppLayout from '../components/AppLayout'
 import api from '../utils/api'
 import NotificationBell from '../components/NotificationBell'
+import { extractData, extractPagination } from '../utils/extractData'
 
 const field =
   'w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white'
@@ -66,9 +67,9 @@ export default function Dashboard({ dark, setDark }) {
       })
 
       const res = await api.get(`/api/tasks?${params}`)
-
-      setTasks(res.data)
-      setPagination(res.pagination)
+      
+      setTasks(extractData(res))
+      setPagination(extractPagination(res))
     } catch (err) {
       setError('Failed to fetch tasks')
     }
@@ -119,7 +120,7 @@ export default function Dashboard({ dark, setDark }) {
   }
 
   const handleStatusChange = async (id, newStatus) => {
-    await api.put(`/api/tasks/${id}/status`, { status: newStatus })
+    await api.put(`/api/tasks/${id}`, { status: newStatus })
     fetchTasks()
   }
 
@@ -224,7 +225,7 @@ export default function Dashboard({ dark, setDark }) {
 
       {/* TASK LIST */}
       <div className="space-y-3">
-        {tasks.map(task => (
+        {Array.isArray(tasks) && tasks.map(task => (
           <div
             key={task._id}
             className="p-4 border rounded-lg flex justify-between cursor-pointer"

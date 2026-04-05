@@ -69,7 +69,7 @@ export default function Profile({ dark, setDark }) {
     } catch (err) {
       setProfileMsg({
         type: 'err',
-        text: err.response?.data?.message || 'Could not save profile'
+        text: err.message || 'Could not save profile'
       })
     } finally {
       setProfileSaving(false)
@@ -93,7 +93,7 @@ export default function Profile({ dark, setDark }) {
     } catch (err) {
       setPwdMsg({
         type: 'err',
-        text: err.response?.data?.message || 'Could not update password'
+        text: err.message || 'Could not update password'
       })
     } finally {
       setPwdSaving(false)
