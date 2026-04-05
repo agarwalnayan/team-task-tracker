@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import TaskDetail from './pages/TaskDetail'
 import Teams from './pages/Teams'
@@ -65,10 +66,18 @@ const App = () => {
             }
           />
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard dark={dark} setDark={setDark} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home dark={dark} setDark={setDark} />
               </ProtectedRoute>
             }
           />

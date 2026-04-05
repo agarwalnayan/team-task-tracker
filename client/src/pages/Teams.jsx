@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useTeams } from '../hooks/useTeams'
 import AppLayout from '../components/AppLayout'
+import JoinTeamByCode from '../components/JoinTeamByCode'
+import RoleManagement from '../components/RoleManagement'
+import TeamManagement from '../components/TeamManagement'
 import api from '../utils/api'
 import { extractData } from '../utils/extractData'
 
@@ -19,8 +23,7 @@ function TeamInitial({ name }) {
 
 export default function Teams({ dark, setDark }) {
   const { user } = useAuth()
-  const [teams, setTeams] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { teams, loading, refetch: fetchTeams } = useTeams()
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const [teamName, setTeamName] = useState('')
@@ -28,22 +31,6 @@ export default function Teams({ dark, setDark }) {
   const [teamCompany, setTeamCompany] = useState('')
   const [inviteEmail, setInviteEmail] = useState({})
   const [inviteBusy, setInviteBusy] = useState({})
-
-  const fetchTeams = async () => {
-    try {
-      const res = await api.get('/api/teams')
-      setTeams(extractData(res))
-    } catch {
-      setError('Failed to load teams')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!user?._id) return
-    fetchTeams()
-  }, [user?._id])
 
   const handleCreateTeam = async (e) => {
     e.preventDefault()
@@ -187,6 +174,8 @@ export default function Teams({ dark, setDark }) {
               </button>
             </form>
           </section>
+
+          <JoinTeamByCode onJoinSuccess={fetchTeams} />
         </aside>
 
         <div className="lg:col-span-8 space-y-5">
@@ -211,114 +200,15 @@ export default function Teams({ dark, setDark }) {
               </p>
             </div>
           ) : (
-            <ul className="space-y-5">
+            <div className="space-y-6">
               {Array.isArray(teams) && teams.map((team) => (
-                <li
-                  key={team._id}
-                  className="rounded-2xl bg-white dark:bg-slate-900 ring-1 ring-slate-200/80 dark:ring-slate-800 shadow-sm overflow-hidden"
-                >
-                  <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap gap-4 items-start justify-between">
-                    <div className="flex gap-4 min-w-0">
-                      <TeamInitial name={team.name} />
-                      <div className="min-w-0">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
-                          {team.name}
-                        </h3>
-                        {team.description && (
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{team.description}</p>
-                        )}
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {team.company && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                              {team.company}
-                            </span>
-                          )}
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300">
-                            {team.members?.length || 0} members
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="px-5 sm:px-6 py-4 bg-slate-50/80 dark:bg-slate-800/20">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
-                      Members
-                    </p>
-                    <ul className="space-y-2">
-                      {team.members?.map((m) => {
-                        const uid = m.user?._id || m.user
-                        const memberUser = m.user
-                        return (
-                          <li
-                            key={String(uid)}
-                            className="flex items-center justify-between gap-3 py-2 border-b border-slate-200/60 dark:border-slate-700/60 last:border-0"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
-                                {(memberUser?.name || '?').charAt(0).toUpperCase()}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                                  {memberUser?.name || 'Member'}
-                                  {m.role === 'admin' && (
-                                    <span className="ml-2 text-xs font-normal text-blue-600 dark:text-blue-400">
-                                      Admin
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                  {memberUser?.email}
-                                </p>
-                              </div>
-                            </div>
-                            {isTeamAdmin(team) && String(uid) !== String(user?._id) && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveMember(team._id, uid)}
-                                className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline shrink-0"
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-
-                  {isTeamAdmin(team) && (
-                    <div className="p-5 sm:p-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                        Invite by email
-                      </p>
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <input
-                          type="email"
-                          placeholder="colleague@company.com"
-                          value={inviteEmail[team._id] || ''}
-                          onChange={(e) =>
-                            setInviteEmail((prev) => ({ ...prev, [team._id]: e.target.value }))
-                          }
-                          className={`${input} sm:flex-1`}
-                        />
-                        <button
-                          type="button"
-                          disabled={inviteBusy[team._id]}
-                          onClick={() => handleAddMember(team._id)}
-                          className="px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
-                        >
-                          {inviteBusy[team._id] ? 'Sending…' : 'Send invite'}
-                        </button>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        They must already have a TaskFlow account with this email.
-                      </p>
-                    </div>
-                  )}
-                </li>
+                <TeamManagement 
+                  key={team._id} 
+                  team={team} 
+                  onUpdate={fetchTeams}
+                />
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </div>

@@ -32,7 +32,7 @@ export default function AppLayout({
             </Link>
             <nav className="hidden sm:flex items-center gap-0.5">
               <NavLink to="/" end className={({ isActive }) => `${linkBase} ${isActive ? linkActive : ''}`}>
-                Tasks
+                Home
               </NavLink>
               <NavLink to="/teams" className={({ isActive }) => `${linkBase} ${isActive ? linkActive : ''}`}>
                 Teams
@@ -81,7 +81,7 @@ export default function AppLayout({
         </div>
         <nav className="sm:hidden flex gap-1 px-4 pb-2 overflow-x-auto border-t border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900">
           <NavLink to="/" end className={({ isActive }) => `${linkBase} whitespace-nowrap ${isActive ? linkActive : ''}`}>
-            Tasks
+            Home
           </NavLink>
           <NavLink to="/teams" className={({ isActive }) => `${linkBase} whitespace-nowrap ${isActive ? linkActive : ''}`}>
             Teams

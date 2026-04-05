@@ -29,10 +29,11 @@ export default function TaskDetail({ dark, setDark }) {
   // ================= FETCH TASK =================
   const fetchTask = async () => {
     try {
-      const data = await api.get(`/api/tasks/${id}`)
-      setTask(data)
-    } catch {
+      const response = await api.get(`/api/tasks/${id}`)
+      setTask(response)
+    } catch (err) {
       setError('Failed to fetch task')
+      console.error('Task fetch error:', err)
     } finally {
       setLoading(false)
     }
