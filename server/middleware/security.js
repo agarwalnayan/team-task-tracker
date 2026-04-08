@@ -1,6 +1,5 @@
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
 const cors = require('cors');
 
 // General rate limiter
@@ -46,12 +45,60 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+// Custom MongoDB sanitization middleware - compatible with all Express versions
+const mongoSanitize = (req, res, next) => {
+  const sanitize = (obj) => {
+    if (typeof obj !== 'object' || obj === null) return obj;
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => sanitize(item));
+    }
+    
+    const sanitized = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        // Remove keys that start with $ (MongoDB operators)
+        if (key.startsWith('$')) {
+          continue;
+        }
+        const value = obj[key];
+        if (typeof value === 'string') {
+          // Remove $ from start of strings
+          sanitized[key] = value.startsWith('$') ? value.substring(1) : value;
+        } else if (typeof value === 'object') {
+          sanitized[key] = sanitize(value);
+        } else {
+          sanitized[key] = value;
+        }
+      }
+    }
+    return sanitized;
+  };
+
+  if (req.body) {
+    req.body = sanitize(req.body);
+  }
+  
+  // Don't modify req.query directly - it's read-only in newer Express
+  // Instead, create a sanitized version if needed
+  if (req.query) {
+    Object.defineProperty(req, 'sanitizedQuery', {
+      value: sanitize(req.query),
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  }
+
+  next();
+};
+
 module.exports = {
   helmet: helmet({
     contentSecurityPolicy: false, // Disable for development
     crossOriginEmbedderPolicy: false
   }),
-  mongoSanitize: mongoSanitize(),
+  mongoSanitize,
   cors: cors(corsOptions),
   generalLimiter,
   authLimiter

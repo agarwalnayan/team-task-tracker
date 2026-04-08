@@ -86,11 +86,10 @@ taskSchema.index({ status: 1, dueDate: 1 });
 taskSchema.index({ title: 'text', description: 'text' });
 
 // Automatically set completedAt when status changes to completed
-taskSchema.pre('save', function(next) {
+taskSchema.pre('save', function() {
   if (this.isModified('status') && this.status === 'completed' && !this.completedAt) {
     this.completedAt = new Date();
   }
-  next();
 });
 
 module.exports = mongoose.model('Task', taskSchema);

@@ -51,18 +51,17 @@ const teamSchema = new mongoose.Schema({
   ]
 }, { timestamps: true })
 
-// Pre-save hook to ensure room code is generated
-teamSchema.pre('save', function(next) {
+// Pre-save hook to ensure room code is generated (Mongoose 6+ style - no next())
+teamSchema.pre('save', function() {
   if (this.isNew && !this.roomCode) {
     // Generate unique 6-character room code
     let roomCode
     do {
       roomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-    } while (roomCode.includes('O') || roomCode.includes('0')) // Avoid confusing characters
+    } while (roomCode.includes('O') || roomCode.includes('0'))
     
     this.roomCode = roomCode
   }
-  next()
 })
 
 module.exports = mongoose.model('Team', teamSchema)

@@ -8,25 +8,25 @@ export function useTeams() {
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
 
+  const fetchTeams = async () => {
+    if (!user) return
+    try {
+      setLoading(true)
+      const res = await api.get('/api/teams')
+      setTeams(extractData(res))
+    } catch (error) {
+      console.error('Error fetching teams:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!user) {
       setTeams([])
       setLoading(false)
       return
     }
-
-    const fetchTeams = async () => {
-      try {
-        setLoading(true)
-        const res = await api.get('/api/teams')
-        setTeams(extractData(res))
-      } catch (error) {
-        console.error('Error fetching teams:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchTeams()
   }, [user])
 
@@ -74,6 +74,7 @@ export function useTeams() {
     isAdmin,
     adminTeams,
     getAllTeamMembers,
-    canCreateTask: adminTeams.length > 0
+    canCreateTask: adminTeams.length > 0,
+    refetch: fetchTeams
   }
 }
