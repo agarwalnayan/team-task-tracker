@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../utils/api'
 import { extractData } from '../utils/extractData'
@@ -41,7 +41,7 @@ export function useTeams() {
   const adminTeams = teams.filter(isAdmin)
 
   // Get all team members from all user's teams
-  const getAllTeamMembers = () => {
+  const getAllTeamMembers = useCallback(() => {
     const membersMap = new Map()
     teams.forEach(team => {
       // Only get members from teams where user is admin
@@ -66,7 +66,7 @@ export function useTeams() {
       }
     })
     return Array.from(membersMap.values())
-  }
+  }, [teams, user])
 
   return {
     teams,

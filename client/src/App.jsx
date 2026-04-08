@@ -1,13 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Home from './pages/Home'
-import Dashboard from './pages/Dashboard'
-import TaskDetail from './pages/TaskDetail'
-import Teams from './pages/Teams'
-import Profile from './pages/Profile'
+
+// Lazy load pages for better performance
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const Home = lazy(() => import('./pages/Home'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const TaskDetail = lazy(() => import('./pages/TaskDetail'))
+const Teams = lazy(() => import('./pages/Teams'))
+const Profile = lazy(() => import('./pages/Profile'))
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
@@ -38,50 +40,57 @@ const App = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login dark={dark} setDark={setDark} />} />
-          <Route path="/register" element={<Register dark={dark} setDark={setDark} />} />
-          <Route
-            path="/tasks/:id"
-            element={
-              <ProtectedRoute>
-                <TaskDetail dark={dark} setDark={setDark} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teams"
-            element={
-              <ProtectedRoute>
-                <Teams dark={dark} setDark={setDark} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile dark={dark} setDark={setDark} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard dark={dark} setDark={setDark} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Home dark={dark} setDark={setDark} />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+        <Suspense fallback={
+          <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-950 font-sans">
+            <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+          </div>
+        }>
+          <Routes>
+            <Route path="/login" element={<Login dark={dark} setDark={setDark} />} />
+            <Route path="/register" element={<Register dark={dark} setDark={setDark} />} />
+            <Route
+              path="/tasks/:id"
+              element={
+                <ProtectedRoute>
+                  <TaskDetail dark={dark} setDark={setDark} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams"
+              element={
+                <ProtectedRoute>
+                  <Teams dark={dark} setDark={setDark} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile dark={dark} setDark={setDark} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard dark={dark} setDark={setDark} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Home dark={dark} setDark={setDark} />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   )

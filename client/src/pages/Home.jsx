@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTeams } from '../hooks/useTeams'
@@ -9,7 +9,7 @@ import { extractData, extractPagination } from '../utils/extractData'
 export default function Home({ dark, setDark }) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { teams, getAllTeamMembers } = useTeams()
+  const { teams, getAllTeamMembers, loading: teamsLoading } = useTeams()
   
   const [tasks, setTasks] = useState([])
   const [stats, setStats] = useState({
@@ -20,43 +20,40 @@ export default function Home({ dark, setDark }) {
     totalTeams: 0,
     totalMembers: 0
   })
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
+  
+  // Show loading until both tasks AND teams are loaded
+  const loading = dataLoading || teamsLoading
   const [hoveredCard, setHoveredCard] = useState(null)
 
+  // Wait for teams data to be ready before showing dashboard
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
-    try {
-      // Fetch user's tasks
-      const tasksRes = await api.get('/api/tasks?limit=10')
-      const tasksData = extractData(tasksRes)
-      
-      // Calculate stats
-      const totalTasks = tasksData.length
-      const completedTasks = tasksData.filter(t => t.status === 'done').length
-      const pendingTasks = tasksData.filter(t => t.status === 'todo').length
-      const inProgressTasks = tasksData.filter(t => t.status === 'inprogress').length
-      const totalTeams = teams.length
-      const totalMembers = getAllTeamMembers().length
-
-      setStats({
-        totalTasks,
-        completedTasks,
-        pendingTasks,
-        inProgressTasks,
-        totalTeams,
-        totalMembers
-      })
-      
-      setTasks(tasksData.slice(0, 5)) // Show recent 5 tasks
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-    } finally {
-      setLoading(false)
+    if (teamsLoading) return // Don't start fetching tasks until teams are loaded
+    
+    const loadData = async () => {
+      try {
+        const tasksRes = await api.get('/api/tasks?limit=10')
+        const tasksData = extractData(tasksRes)
+        
+        setStats({
+          totalTasks: tasksData.length,
+          completedTasks: tasksData.filter(t => t.status === 'done').length,
+          pendingTasks: tasksData.filter(t => t.status === 'todo').length,
+          inProgressTasks: tasksData.filter(t => t.status === 'inprogress').length,
+          totalTeams: teams.length,
+          totalMembers: getAllTeamMembers().length
+        })
+        
+        setTasks(tasksData.slice(0, 5))
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+      } finally {
+        setDataLoading(false)
+      }
     }
-  }
+    
+    loadData()
+  }, [teamsLoading, teams, getAllTeamMembers])
 
   const StatCard = ({ title, value, icon, color, link, id, progress }) => (
     <div 

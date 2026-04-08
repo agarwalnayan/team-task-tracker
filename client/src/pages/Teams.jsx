@@ -180,7 +180,7 @@ export default function Teams({ dark, setDark }) {
 
         <div className="lg:col-span-8 space-y-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Your teams ({teams.length})
+            Your teams {loading ? '...' : `(${teams.length})`}
           </h2>
 
           {loading ? (
