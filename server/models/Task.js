@@ -52,6 +52,41 @@ const taskSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
+  category: {
+    type: String,
+    enum: ['Development', 'Design', 'Marketing', 'Sales', 'Support', 'Management', 'Research', 'General'],
+    default: 'General'
+  },
+  complexity: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 3
+  },
+  aiInsights: {
+    priorityScore: {
+      type: Number,
+      min: 1,
+      max: 10
+    },
+    estimatedHours: {
+      type: Number,
+      min: 0
+    },
+    reasoning: String,
+    recommendations: [{
+      memberId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      reason: String,
+      fitScore: {
+        type: Number,
+        min: 1,
+        max: 10
+      }
+    }]
+  },
   parentTask: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task'
@@ -73,6 +108,14 @@ const taskSchema = new mongoose.Schema({
   actualHours: {
     type: Number,
     min: 0
+  },
+  aiGenerated: {
+    type: Boolean,
+    default: false
+  },
+  aiFallback: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

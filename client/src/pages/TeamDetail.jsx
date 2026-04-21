@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AppLayout from '../components/AppLayout'
 import api from '../utils/api'
+import { formatDistanceToNow } from 'date-fns'
 
 export default function TeamDetail({ dark, setDark }) {
   const { id } = useParams()
@@ -16,6 +17,12 @@ export default function TeamDetail({ dark, setDark }) {
   const [team, setTeam] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Team Tasks & Conversations State
+  const [teamTasks, setTeamTasks] = useState([])
+  const [teamComments, setTeamComments] = useState([])
+  const [activeTab, setActiveTab] = useState('tasks') // 'tasks' or 'conversations'
+  const [tasksLoading, setTasksLoading] = useState(false)
 
   // Add validation
   if (!id) {
@@ -73,8 +80,59 @@ export default function TeamDetail({ dark, setDark }) {
   useEffect(() => {
     if (id) {
       fetchTeam()
+      fetchTeamTasks()
+      fetchTeamComments()
     }
   }, [id])
+
+  // Fetch all tasks for this team
+  const fetchTeamTasks = async () => {
+    if (!id) return
+    try {
+      setTasksLoading(true)
+      const response = await api.get(`/api/tasks?team=${id}&limit=50`)
+      setTeamTasks(response.data || [])
+    } catch (err) {
+      console.error('Error fetching team tasks:', err)
+    } finally {
+      setTasksLoading(false)
+    }
+  }
+
+  // Fetch recent comments from all team tasks
+  const fetchTeamComments = async () => {
+    if (!id) return
+    try {
+      // First get tasks, then fetch comments for each
+      const tasksRes = await api.get(`/api/tasks?team=${id}&limit=20`)
+      const tasks = tasksRes.data || []
+      
+      // Fetch comments for each task
+      const allComments = []
+      for (const task of tasks) {
+        try {
+          const commentsRes = await api.get(`/api/comments/task/${task._id}`)
+          const comments = commentsRes.data || []
+          // Add task info to each comment
+          comments.forEach(comment => {
+            allComments.push({
+              ...comment,
+              taskTitle: task.title,
+              taskId: task._id
+            })
+          })
+        } catch (e) {
+          // Skip if no comments
+        }
+      }
+      
+      // Sort by date, newest first
+      allComments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      setTeamComments(allComments.slice(0, 20)) // Keep only recent 20
+    } catch (err) {
+      console.error('Error fetching team comments:', err)
+    }
+  }
 
   // Handlers
   const handleAddMember = async (e) => {
@@ -433,6 +491,132 @@ export default function TeamDetail({ dark, setDark }) {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Team Tasks & Conversations */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Team Activity
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('tasks')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'tasks'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                Tasks ({teamTasks.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('conversations')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === 'conversations'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                Conversations ({teamComments.length})
+              </button>
+            </div>
+          </div>
+
+          {/* Tasks Tab */}
+          {activeTab === 'tasks' && (
+            <div className="space-y-3">
+              {tasksLoading ? (
+                <div className="text-center py-8">
+                  <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-sm text-slate-500 mt-2">Loading tasks...</p>
+                </div>
+              ) : teamTasks.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <p>No tasks assigned to this team yet.</p>
+                </div>
+              ) : (
+                teamTasks.map(task => (
+                  <div
+                    key={task._id}
+                    onClick={() => navigate(`/tasks/${task._id}`)}
+                    className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-slate-900 dark:text-white mb-1">
+                          {task.title}
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">
+                          {task.description || 'No description'}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            task.status === 'done' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
+                            task.status === 'inprogress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                            'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}>
+                            {task.status === 'done' ? 'Completed' :
+                             task.status === 'inprogress' ? 'In Progress' :
+                             'Todo'}
+                          </span>
+                          {task.assignedTo && (
+                            <span className="text-xs text-slate-500">
+                              Assigned to: {task.assignedTo.name}
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-400">
+                            {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Conversations Tab */}
+          {activeTab === 'conversations' && (
+            <div className="space-y-4">
+              {teamComments.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <p>No conversations yet. Start by adding comments to tasks.</p>
+                </div>
+              ) : (
+                teamComments.map(comment => (
+                  <div
+                    key={comment._id}
+                    onClick={() => navigate(`/tasks/${comment.taskId}`)}
+                    className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-sm font-medium flex-shrink-0">
+                        {(comment.user?.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-slate-900 dark:text-white text-sm">
+                            {comment.user?.name || 'Unknown'}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-2 line-clamp-2">
+                          {comment.content}
+                        </p>
+                        <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                          on: {comment.taskTitle}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         {/* Delete Team - Only for creators */}

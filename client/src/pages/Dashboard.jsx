@@ -2,22 +2,26 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTeams } from '../hooks/useTeams'
+import { useAI } from '../hooks/useAI'
 import AppLayout from '../components/AppLayout'
+import AITaskCreator from '../components/AITaskCreator'
+import AIInsights from '../components/AIInsights'
 import api from '../utils/api'
 import NotificationBell from '../components/NotificationBell'
 import NotificationInfo from '../components/NotificationInfo'
 import { extractData, extractPagination } from '../utils/extractData'
 
+// Design System - Cohesive color palette
 const field =
-  'w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white'
+  'w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all'
 
 const lbl =
-  'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5'
+  'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2'
 
 const statusColors = {
-  todo: 'bg-gray-100 text-gray-600',
-  inprogress: 'bg-blue-100 text-blue-600',
-  done: 'bg-green-100 text-green-600'
+  todo: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400',
+  inprogress: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400',
+  done: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
 }
 
 const statusLabels = {
@@ -29,7 +33,8 @@ const statusLabels = {
 export default function Dashboard({ dark, setDark }) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { teams, getAllTeamMembers, canCreateTask } = useTeams()
+  const { teams, memberTeams, getAllTeamMembers, canCreateTask } = useTeams()
+  const { smartSearch } = useAI()
 
   const [tasks, setTasks] = useState([])
 
@@ -70,8 +75,11 @@ export default function Dashboard({ dark, setDark }) {
       })
 
       const res = await api.get(`/api/tasks?${params}`)
+      const tasksData = extractData(res)
+      console.log('Fetched tasks:', tasksData)
+      console.log('First task team:', tasksData[0]?.team)
       
-      setTasks(extractData(res))
+      setTasks(tasksData)
       setPagination(extractPagination(res))
     } catch (err) {
       setError('Failed to fetch tasks')
@@ -140,34 +148,43 @@ export default function Dashboard({ dark, setDark }) {
     <AppLayout
       dark={dark}
       setDark={setDark}
-      title="Task Management"
-      subtitle={`${pagination.total} tasks`}
+      title="Dashboard"
+      subtitle={`${pagination.total} total tasks`}
     >
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Tasks</h2>
-        <NotificationBell />
-      </div>
-
       {/* ERROR */}
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-
-      {/* CREATE BUTTON */}
-      {canCreateTask && (
-        <div className="flex justify-end mb-6">
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            {showForm ? 'Close' : '+ New Task'}
-          </button>
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md">
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 
+      {/* TOP SECTION: Task Entry + Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+        <div className="lg:col-span-2">
+          <AITaskCreator onTaskCreated={fetchTasks} dark={dark} />
+        </div>
+        <div>
+          <AIInsights dark={dark} />
+        </div>
+      </div>
+
+      {/* TASK CREATION TOGGLE */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-base font-semibold text-slate-900 dark:text-white">Task List</h3>
+        {canCreateTask && (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+          >
+            {showForm ? 'Cancel' : 'Create Task Manually'}
+          </button>
+        )}
+      </div>
+
       {!canCreateTask && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg p-4 mb-6">
-          <p className="text-amber-800 dark:text-amber-200 text-sm">
-            🔒 Only team admins can create tasks. Contact your team admin to create tasks.
+        <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-md">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Only team admins can create tasks. Contact your team admin.
           </p>
         </div>
       )}
@@ -205,9 +222,9 @@ export default function Dashboard({ dark, setDark }) {
               className={field}
             >
               <option value="">Choose a team first</option>
-              {teams.filter(team => team.members?.some(m => String(m.user?._id || m.user) === String(user._id) && m.role === 'admin')).map(team => (
+              {memberTeams.map(team => (
                 <option key={team._id} value={team._id}>
-                  📋 {team.name}
+                  {team.name} {team.members?.some(m => String(m.user?._id || m.user) === String(user._id) && m.role === 'admin') ? '(Admin)' : '(Member)'}
                 </option>
               ))}
             </select>
@@ -225,8 +242,8 @@ export default function Dashboard({ dark, setDark }) {
                 className={field}
               >
                 <option value="">Select assignment type</option>
-                <option value="team">📋 Whole Team</option>
-                <option value="individual">👤 Individual Member</option>
+                <option value="team">Whole Team</option>
+                <option value="individual">Individual Member</option>
               </select>
             </div>
           )}
@@ -244,7 +261,7 @@ export default function Dashboard({ dark, setDark }) {
                   .filter(m => m.teamId === selectedTeam)
                   .map(m => (
                     <option key={m._id} value={m._id}>
-                      👤 {m.name}
+                      {m.name}
                     </option>
                   ))}
               </select>
@@ -258,9 +275,9 @@ export default function Dashboard({ dark, setDark }) {
               onChange={e => setStatus(e.target.value)}
               className={field}
             >
-              <option value="todo">📝 Todo</option>
-              <option value="inprogress">🚀 In Progress</option>
-              <option value="done">✅ Done</option>
+              <option value="todo">Todo</option>
+              <option value="inprogress">In Progress</option>
+              <option value="done">Done</option>
             </select>
           </div>
 
@@ -270,12 +287,12 @@ export default function Dashboard({ dark, setDark }) {
               disabled={creating}
               className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {creating ? 'Creating...' : '🚀 Create Task'}
+              {creating ? 'Creating...' : 'Create Task'}
             </button>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-6 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+              className="px-6 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             >
               Cancel
             </button>
@@ -320,34 +337,34 @@ export default function Dashboard({ dark, setDark }) {
                     {task.title}
                   </h3>
                   <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      task.status === 'done' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' :
-                      task.status === 'inprogress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' :
-                      'bg-gray-100 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300'
+                    <span className={`px-2.5 py-0.5 rounded text-xs font-medium ${
+                      task.status === 'done' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
+                      task.status === 'inprogress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                      'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                     }`}>
-                      {task.status === 'done' ? '✅ Completed' :
-                       task.status === 'inprogress' ? '🚀 In Progress' :
-                       '📝 Todo'}
+                      {task.status === 'done' ? 'Completed' :
+                       task.status === 'inprogress' ? 'In Progress' :
+                       'Todo'}
                     </span>
                     {task.team && (
-                      <span className="px-3 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded-full text-xs font-medium">
-                        📋 {task.team.name || 'Team'}
+                      <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded text-xs font-medium" title={`Team: ${typeof task.team === 'object' ? task.team.name : task.team}`}>
+                        {typeof task.team === 'object' ? (task.team.name || 'Team') : 'Team'}
                       </span>
                     )}
                     {task.assignedTo && (
-                      <span className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 rounded-full text-xs font-medium">
-                        👤 {task.assignedTo.name || 'Assigned'}
+                      <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded text-xs font-medium">
+                        {task.assignedTo.name || 'Assigned'}
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => navigate(`/tasks/${task._id}`)}
-                    className="px-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                  >
-                    View Details
-                  </button>
+            onClick={() => navigate(`/tasks/${task._id}`)}
+            className="px-3 py-1.5 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            View Details
+          </button>
                 </div>
               </div>
 
@@ -364,16 +381,16 @@ export default function Dashboard({ dark, setDark }) {
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                 <div className="flex items-center gap-4">
                   <span>
-                    📅 Created: {new Date(task.createdAt).toLocaleDateString()}
+                    Created: {new Date(task.createdAt).toLocaleDateString()}
                   </span>
-                  {task.updatedAt && (
+                  {task.updatedAt && task.updatedAt !== task.createdAt && (
                     <span>
-                      🔄 Updated: {new Date(task.updatedAt).toLocaleDateString()}
+                      Updated: {new Date(task.updatedAt).toLocaleDateString()}
                     </span>
                   )}
                   {task.createdBy && (
                     <span>
-                      👤 By: {task.createdBy.name || 'Unknown'}
+                      By: {task.createdBy.name || 'Unknown'}
                     </span>
                   )}
                 </div>
@@ -389,18 +406,18 @@ export default function Dashboard({ dark, setDark }) {
                     <select
                       value={task.status}
                       onChange={(e) => handleStatusChange(task._id, e.target.value)}
-                      className="text-sm px-3 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                      className="text-xs px-2.5 py-1.5 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
                     >
-                      <option value="todo">📝 Todo</option>
-                      <option value="inprogress">🚀 In Progress</option>
-                      <option value="done">✅ Done</option>
+                      <option value="todo">Todo</option>
+                      <option value="inprogress">In Progress</option>
+                      <option value="done">Done</option>
                     </select>
                   </div>
                   <button
                     onClick={() => handleDeleteTask(task._id)}
-                    className="px-3 py-1.5 text-sm bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors"
+                    className="px-3 py-1.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition-colors"
                   >
-                    🗑️ Delete Task
+                    Delete
                   </button>
                 </div>
               </div>

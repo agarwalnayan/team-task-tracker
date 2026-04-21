@@ -101,33 +101,37 @@ export default function TeamManagement({ team, onUpdate }) {
               👑
             </button>
           )}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-            title="Team Settings"
-          >
-            ⚙️
-          </button>
+          {isTeamAdmin && (
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+              title="Team Settings"
+            >
+              ⚙️
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Room Code Display */}
-      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Room Code</p>
-            <p className="text-lg font-bold text-blue-800 dark:text-blue-200">{team.roomCode}</p>
+      {/* Room Code Display - Only for admins */}
+      {isTeamAdmin && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Room Code</p>
+              <p className="text-lg font-bold text-blue-800 dark:text-blue-200">{team.roomCode}</p>
+            </div>
+            <div className="text-blue-600 dark:text-blue-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
           </div>
-          <div className="text-blue-600 dark:text-blue-400">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-            </svg>
-          </div>
+          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+            Share this code with team members to join
+          </p>
         </div>
-        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-          Share this code with team members to join
-        </p>
-      </div>
+      )}
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50">
@@ -173,8 +177,8 @@ export default function TeamManagement({ team, onUpdate }) {
         </div>
       )}
 
-      {/* Team Settings */}
-      {showSettings && (
+      {/* Team Settings - Only for admins */}
+      {isTeamAdmin && showSettings && (
         <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
           <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Team Settings</h4>
           

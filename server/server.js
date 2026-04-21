@@ -10,13 +10,16 @@ const authRoutes = require('./routes/authRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const commentRoutes = require('./routes/commentRoutes');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
-    credentials: true
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
   }
 });
 
@@ -27,8 +30,14 @@ app.set('io', io);
 connectDB();
 
 // CORS - MUST BE BEFORE ROUTES
+// Allow all origins for cross-device access (development only)
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    // Allow all origins in development
+    callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -54,6 +63,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/comments', commentRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -97,9 +108,28 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(` Server running on http://localhost:${PORT}`);
-  console.log(` Environment: ${process.env.NODE_ENV}`);
+const os = require('os');
+
+// Get local IP address for network access
+const getLocalIP = () => {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+};
+
+server.listen(PORT, '0.0.0.0', () => {
+  const localIP = getLocalIP();
+  console.log(`✅ Server running on:`);
+  console.log(`   Local:   http://localhost:${PORT}`);
+  console.log(`   Network: http://${localIP}:${PORT}`);
+  console.log(`   Environment: ${process.env.NODE_ENV}`);
+  console.log(`\n📱 For other devices, use: http://${localIP}:${PORT}`);
 });
 
 module.exports = app;

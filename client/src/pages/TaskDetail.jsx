@@ -5,15 +5,17 @@ import { useTeamMembers } from '../hooks/useTeamMembers'
 import AppLayout from '../components/AppLayout'
 import api from '../utils/api'
 import Comments from '../components/Comments'
+import { extractData } from '../utils/extractData'
 
+// Design System - Cohesive color palette matching Dashboard
 const field =
-  'w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 text-slate-900 dark:text-white'
+  'w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all'
 
 const lbl =
-  'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5'
+  'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2'
 
 const card =
-  'rounded-2xl bg-white dark:bg-slate-900 ring-1 ring-slate-200/80 dark:ring-slate-800 shadow-sm p-6 sm:p-7'
+  'bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6'
 
 export default function TaskDetail({ dark, setDark }) {
   const { id } = useParams()
@@ -30,7 +32,9 @@ export default function TaskDetail({ dark, setDark }) {
   const fetchTask = async () => {
     try {
       const response = await api.get(`/api/tasks/${id}`)
-      setTask(response)
+      // Extract actual task data from response wrapper
+      const taskData = response.data || response
+      setTask(taskData)
     } catch (err) {
       setError('Failed to fetch task')
       console.error('Task fetch error:', err)
@@ -52,10 +56,12 @@ export default function TaskDetail({ dark, setDark }) {
   const handleAssigneeChange = async (e) => {
     const value = e.target.value
     try {
-      const data = await api.put(`/api/tasks/${id}`, {
+      const response = await api.put(`/api/tasks/${id}`, {
         assignedTo: value === '' ? null : value
       })
-      setTask(data)
+      // Extract actual task data from response wrapper
+      const taskData = response.data || response
+      setTask(taskData)
     } catch (err) {
       setError(err.message || 'Failed to update assignee')
     }
@@ -86,9 +92,9 @@ export default function TaskDetail({ dark, setDark }) {
   }
 
   const statusColors = {
-    todo: 'bg-slate-100 text-slate-700',
-    inprogress: 'bg-blue-100 text-blue-800',
-    done: 'bg-emerald-100 text-emerald-800'
+    todo: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400',
+    inprogress: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400',
+    done: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
   }
 
   const statusLabels = {
@@ -130,16 +136,27 @@ export default function TaskDetail({ dark, setDark }) {
 
         {/* TASK INFO */}
         <section className={card}>
-          <span className={`text-xs px-3 py-1 rounded ${statusColors[task.status]}`}>
-            {statusLabels[task.status]}
-          </span>
+          <div className="flex items-center gap-3 mb-4">
+            <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${statusColors[task.status]}`}>
+              {statusLabels[task.status]}
+            </span>
+            {task.assignedTo && (
+              <span className="text-sm text-slate-600 dark:text-slate-400">
+                Assigned to: <span className="font-medium text-slate-900 dark:text-slate-200">{task.assignedTo.name}</span>
+              </span>
+            )}
+          </div>
 
           {task.description && (
-            <p className="mt-4 text-sm">{task.description}</p>
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg mb-4">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{task.description}</p>
+            </div>
           )}
 
-          <div className="mt-4 text-sm text-gray-500">
-            Owner: {task.createdBy?.name}
+          <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+            <span>Created by: <span className="font-medium text-slate-700 dark:text-slate-300">{task.createdBy?.name}</span></span>
+            <span>·</span>
+            <span>{new Date(task.createdAt).toLocaleDateString()}</span>
           </div>
 
           {/* ASSIGN */}
@@ -164,30 +181,32 @@ export default function TaskDetail({ dark, setDark }) {
 
         {/* ATTACHMENTS */}
         <section className={card}>
-          <h3 className="font-semibold mb-4">Attachments</h3>
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-4">Attachments</h3>
           
-          {task.attachments?.map((f, i) => (
-            <a
-              key={i}
-              href={`http://localhost:5000/${f.path}`}
-              target="_blank"
-              rel="noreferrer"
-              className="block text-blue-600 mb-2"
-            >
-              {f.filename}
-            </a>
-          ))}
-
-          {/* File upload temporarily disabled - server endpoint not available */}
-          <div className="mt-4 text-sm text-gray-500">
-            File upload feature temporarily unavailable
-          </div>
+          {task.attachments?.length > 0 ? (
+            <div className="space-y-2">
+              {task.attachments.map((f, i) => (
+                <a
+                  key={i}
+                  href={`http://localhost:5000/${f.path}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                  {f.filename}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">No attachments</p>
+          )}
         </section>
 
-        {/* COMMENTS (MERGED CLEANLY) */}
+        {/* COMMENTS */}
         <section className={card}>
-          <h3 className="font-semibold mb-4">Comments</h3>
-
           <Comments taskId={id} />
         </section>
 
