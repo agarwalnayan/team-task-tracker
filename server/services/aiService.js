@@ -50,23 +50,115 @@ class AIService {
   }
 
   static parseMockTask(text) {
-    // Simple regex-based parsing for mock mode
-    const title = text.replace(/create a task (for \w+ )?(in \w+ )?/i, '').split(' by ')[0] || text.substring(0, 50);
-    const assignedMatch = text.match(/for (\w+)/i);
-    const teamMatch = text.match(/in (\w+) team/i);
-    const dateMatch = text.match(/by (tomorrow|next week|next month|\w+)/i);
+    // Enhanced regex-based parsing for mock mode with AI analysis
+    const title = text.replace(/(create|assign|ask)( a task)? (for|to) \w+/i, '').replace(/by .+/i, '').trim() || text.substring(0, 50);
     
-    return {
+    // Skip common articles (a, an, the, task, this) and capture the actual name
+    // Matches: "assign to ashish...", "ask nayan to...", "for john..."
+    const assignedMatch = text.match(/(?:for|to|assign|ask)\s+(?:a\s+|an\s+|the\s+|task\s+|this\s+)?(\w+)/i);
+    
+    // Try alternative pattern: "assign a task to [name]"
+    let assignedToName = assignedMatch ? assignedMatch[1] : null;
+    if (!assignedToName || ['a', 'an', 'the', 'task', 'this'].includes(assignedToName.toLowerCase())) {
+      const altMatch = text.match(/(?:task\s+)?(?:to|for)\s+(\w+)(?:\s+to\s+|\s+for\s+|\s+by\s+|\s+in\s+|$)/i);
+      if (altMatch) {
+        assignedToName = altMatch[1];
+      }
+    }
+    
+    const teamMatch = text.match(/in\s+(\w+)\s+(?:team|department)/i);
+    const dateMatch = text.match(/by\s+(tomorrow|next week|next month|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\w+)/i);
+    
+    // Smart priority detection
+    let priority = 'medium';
+    if (text.match(/\b(urgent|asap|critical|emergency|immediately)\b/i)) priority = 'high';
+    else if (text.match(/\b(low|minor|whenever|someday)\b/i)) priority = 'low';
+    
+    // AI Analysis - smart insights
+    const urgencyFactors = [];
+    if (text.match(/\b(deadline|due|by)\b/i)) urgencyFactors.push('time-sensitive');
+    if (text.match(/\b(meeting|presentation|review|board)\b/i)) urgencyFactors.push('meeting dependent');
+    if (text.match(/\b(client|customer|vip)\b/i)) urgencyFactors.push('client facing');
+    
+    // Estimate hours based on task complexity keywords
+    let estimatedHours = null;
+    if (text.match(/\b(quick|small|simple|fix|update)\b/i)) estimatedHours = 1;
+    else if (text.match(/\b(report|analysis|review|documentation)\b/i)) estimatedHours = 4;
+    else if (text.match(/\b(project|develop|build|implement|complete)\b/i)) estimatedHours = 8;
+    else if (text.match(/\b(research|investigation|complex)\b/i)) estimatedHours = 16;
+    
+    // Importance analysis
+    let importance = 'normal';
+    if (text.match(/\b(board meeting|ceo|executive|critical|revenue|client)\b/i)) importance = 'critical';
+    else if (text.match(/\b(urgent|important|high priority|asap)\b/i)) importance = 'high';
+    else if (text.match(/\b(routine|maintenance|cleanup)\b/i)) importance = 'low';
+    
+    // Generate reasoning
+    let reasoning = '';
+    if (importance === 'critical') reasoning = 'High business impact detected - board/executive level task';
+    else if (urgencyFactors.length > 0) reasoning = `Urgency factors: ${urgencyFactors.join(', ')}`;
+    else if (estimatedHours) reasoning = `Estimated ${estimatedHours} hours based on task complexity`;
+    else reasoning = 'Standard task priority';
+    
+    const result = {
       title: title.charAt(0).toUpperCase() + title.slice(1),
       description: text,
-      priority: text.includes('urgent') || text.includes('asap') ? 'high' : 'medium',
-      dueDate: dateMatch ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
+      priority: priority,
+      dueDate: dateMatch ? this.calculateDueDate(dateMatch[1]) : null,
       dueDateText: dateMatch ? dateMatch[1] : null,
-      tags: ['task', 'ai-generated'],
-      assignedToName: assignedMatch ? assignedMatch[1] : null,
+      tags: this.extractTags(text),
+      assignedToName: assignedToName,
       teamName: teamMatch ? teamMatch[1] + ' team' : null,
-      estimatedHours: null
+      estimatedHours: estimatedHours,
+      aiAnalysis: {
+        estimatedHours: estimatedHours,
+        importance: importance,
+        urgencyFactors: urgencyFactors,
+        reasoning: reasoning,
+        suggestedApproach: this.getSuggestedApproach(text)
+      }
     };
+    
+    console.log('🤖 Mock AI parsed:', text, '→', { assignee: assignedToName, title: result.title });
+    return result;
+  }
+
+  static calculateDueDate(dateText) {
+    const today = new Date();
+    const lowerText = dateText.toLowerCase();
+    
+    if (lowerText === 'tomorrow') {
+      return new Date(today.setDate(today.getDate() + 1)).toISOString().split('T')[0];
+    } else if (lowerText === 'next week') {
+      return new Date(today.setDate(today.getDate() + 7)).toISOString().split('T')[0];
+    } else if (lowerText === 'next month') {
+      return new Date(today.setMonth(today.getMonth() + 1)).toISOString().split('T')[0];
+    }
+    
+    // Try to find day of week
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const targetDay = days.indexOf(lowerText);
+    if (targetDay !== -1) {
+      const currentDay = today.getDay();
+      const daysUntil = (targetDay - currentDay + 7) % 7 || 7;
+      return new Date(today.setDate(today.getDate() + daysUntil)).toISOString().split('T')[0];
+    }
+    
+    return null;
+  }
+
+  static extractTags(text) {
+    const keywords = ['bug', 'feature', 'design', 'marketing', 'sales', 'report', 'meeting', 'client', 'documentation', 'review'];
+    const found = keywords.filter(kw => text.toLowerCase().includes(kw));
+    return found.length > 0 ? found : ['task', 'ai-generated'];
+  }
+
+  static getSuggestedApproach(text) {
+    if (text.match(/\b(report|analysis)\b/i)) return 'Start with data gathering, then analysis';
+    if (text.match(/\b(fix|bug|issue)\b/i)) return 'Reproduce first, then implement fix';
+    if (text.match(/\b(meeting|presentation)\b/i)) return 'Prepare outline, then build slides';
+    if (text.match(/\b(research|investigate)\b/i)) return 'Define scope, gather sources, synthesize';
+    return 'Break into subtasks and tackle systematically';
   }
 
   // 🎯 Smart Task Suggestions
@@ -115,41 +207,59 @@ class AIService {
     }
   }
 
-  // 💬 Natural Language Task Creation - Enhanced
+  // 💬 Natural Language Task Creation - Enhanced with AI Analysis
   static async parseTaskFromText(naturalText) {
     if (USE_MOCK_AI) return this.parseMockTask(naturalText);
     try {
       const prompt = `
-        Extract task details from this natural language: "${naturalText}"
+        Extract task details and provide AI analysis from this natural language: "${naturalText}"
+        
+        Today's date: ${new Date().toISOString().split('T')[0]}
         
         Extract and return as JSON:
         {
           "title": "Clear, concise task title (5-10 words)",
           "description": "Full task description with context",
-          "priority": "high/medium/low based on urgency",
+          "priority": "high/medium/low based on urgency and importance",
           "dueDate": "YYYY-MM-DD format or null if not specified",
-          "dueDateText": "Original date mentioned (e.g., 'next month', 'Friday', 'Dec 25')",
-          "tags": ["relevant", "tags", "based", "on", "content"],
-          "assignedToName": "Person's name mentioned for assignment (e.g., 'Nayan', 'John') or null",
-          "teamName": "Team/department mentioned (e.g., 'sales team', 'design team') or null",
-          "estimatedHours": number or null
+          "dueDateText": "Original date mentioned (e.g., 'next month', 'Friday')",
+          "tags": ["relevant", "tags"],
+          "assignedToName": "Person's name mentioned or null",
+          "teamName": "Team/department mentioned or null",
+          "estimatedHours": number or null,
+          "aiAnalysis": {
+            "estimatedHours": "Estimate based on task complexity (1-40 hours)",
+            "importance": "critical/high/normal/low",
+            "urgencyFactors": ["list of urgency indicators found"],
+            "reasoning": "Explain why this priority/importance was assigned",
+            "suggestedApproach": "Brief strategy for completing this task efficiently"
+          }
         }
         
-        For dates like "next month", "tomorrow", "next Friday", calculate from today.
-        For assignees, extract just the name - don't make up IDs.
-        For teams, extract the team name mentioned.
+        Analyze carefully:
+        - Look for urgency words: urgent, asap, critical, deadline, due
+        - Look for importance indicators: board meeting, client, executive, revenue
+        - Estimate hours based on: quick(1-2h), report(3-4h), project(8-16h), research(20-40h)
+        - Calculate exact dates for "tomorrow", "next Monday", "end of week"
         
-        Example input: "create a task for nayan in sales team to increase sales by double by next month"
-        Example output: {
-          "title": "Increase sales by double",
-          "description": "Sales team needs to double their sales performance",
+        Example: "Ask Nayan to fix the login bug by Friday - it's critical for the demo"
+        Output: {
+          "title": "Fix login bug",
+          "description": "Critical login bug needs fixing before demo",
           "priority": "high",
-          "dueDate": "2024-02-19",
-          "dueDateText": "next month",
-          "tags": ["sales", "performance", "growth"],
-          "assignedToName": "nayan",
-          "teamName": "sales team",
-          "estimatedHours": null
+          "dueDate": "2024-04-26",
+          "dueDateText": "Friday",
+          "tags": ["bug", "login", "critical"],
+          "assignedToName": "Nayan",
+          "teamName": null,
+          "estimatedHours": 2,
+          "aiAnalysis": {
+            "estimatedHours": 2,
+            "importance": "critical",
+            "urgencyFactors": ["demo deadline", "critical bug"],
+            "reasoning": "Login bug blocks demo - critical business impact",
+            "suggestedApproach": "Reproduce bug locally, implement fix, test thoroughly"
+          }
         }
       `;
       
@@ -159,17 +269,7 @@ class AIService {
       return JSON.parse(cleanText);
     } catch (error) {
       console.error('AI Text Parsing Error:', error);
-      return { 
-        title: naturalText, 
-        description: '', 
-        priority: 'medium', 
-        dueDate: null, 
-        dueDateText: null,
-        tags: [], 
-        assignedToName: null,
-        teamName: null,
-        estimatedHours: null
-      };
+      return this.parseMockTask(naturalText); // Fallback to smart mock parsing
     }
   }
 

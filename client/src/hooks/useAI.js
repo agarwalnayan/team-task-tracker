@@ -126,12 +126,27 @@ export function useAI() {
     }
   }, [])
 
-  // 🎯 Create AI-Enhanced Task
-  const createAITask = useCallback(async (text, teamId = null, assignedTo = null) => {
+  // 🎯 Create AI-Enhanced Task - NEW MODE-BASED API
+  const createAITask = useCallback(async (params) => {
     try {
       setLoading(true)
       setError('')
-      const response = await api.post('/api/ai/create-task', { text, teamId, assignedTo })
+      
+      // Support both old and new API formats
+      if (typeof params === 'string') {
+        // Old format: createAITask(text, teamId, assignedTo)
+        const [text, teamId, assignedTo] = arguments
+        const response = await api.post('/api/ai/create-task', { 
+          mode: 'ai', 
+          text, 
+          teamId, 
+          assignedTo 
+        })
+        return response
+      }
+      
+      // New format: createAITask({ mode, text, title, description, ... })
+      const response = await api.post('/api/ai/create-task', params)
       return response
     } catch (err) {
       setError(err.message || 'Failed to create AI task')

@@ -17,7 +17,7 @@ const circuitBreakers = new Map();
 const CIRCUIT_BREAKER_THRESHOLD = 5; // failures before opening
 const CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute before trying again
 const RATE_LIMIT_WINDOW = 60000; // 1 minute window
-const RATE_LIMIT_MAX_REQUESTS = 10; // max requests per window
+const RATE_LIMIT_MAX_REQUESTS = 30; // max requests per window (increased for real-time typing)
 
 /**
  * Rate Limiter Middleware

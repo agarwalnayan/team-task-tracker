@@ -333,6 +333,85 @@ router.post('/create-task',
       };
     }
     
+    // Smart user lookup by name
+    let assignedTo = null;
+    let assigneeFound = false;
+    
+    if (parsedTask.assignedToName) {
+      const searchName = parsedTask.assignedToName.trim().toLowerCase();
+      const allUsers = await User.find({}, 'name email');
+      
+      // Smart matching: exact match
+      let assignee = allUsers.find(u => u.name.trim().toLowerCase() === searchName);
+      
+      // First name match (e.g., "ashish" matches "Ashish Sha")
+      if (!assignee) {
+        assignee = allUsers.find(u => {
+          const userNameLower = u.name.trim().toLowerCase();
+          const firstName = userNameLower.split(' ')[0];
+          return firstName === searchName;
+        });
+      }
+      
+      // Partial match: starts with or contains
+      if (!assignee) {
+        assignee = allUsers.find(u => {
+          const userNameLower = u.name.trim().toLowerCase();
+          return userNameLower.startsWith(searchName + ' ') ||
+                 userNameLower.includes(searchName);
+        });
+      }
+      
+      if (assignee) {
+        assignedTo = assignee._id;
+        assigneeFound = true;
+        console.log(`✅ Found assignee: ${assignee.name} (ID: ${assignee._id}) for search: "${searchName}"`);
+      } else {
+        console.log(`❌ User not found for: "${searchName}"`);
+        return res.status(400).json({
+          success: false,
+          message: `User "${parsedTask.assignedToName}" not found. Available users: ${allUsers.map(u => u.name).join(', ')}`,
+          error: 'USER_NOT_FOUND',
+          aiParsed: { assignedToName: parsedTask.assignedToName }
+        });
+      }
+    }
+    
+    // Smart team lookup by name
+    let finalTeamId = null;
+    if (parsedTask.teamName) {
+      const team = await Team.findOne({
+        name: { $regex: new RegExp(parsedTask.teamName.replace('team', '').trim(), 'i') }
+      });
+      if (team) {
+        finalTeamId = team._id;
+      }
+    }
+    
+    // If still no assignee, require explicit assignment
+    if (!assignedTo && !finalTeamId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please mention who to assign this task to. Example: "Ask Nayan to..." or "Assign to the Sales team..."',
+        error: 'ASSIGNEE_REQUIRED',
+        aiParsed: parsedTask
+      });
+    }
+    
+    // If team but no assignee, assign to creator
+    if (!assignedTo && finalTeamId) {
+      assignedTo = req.user._id;
+    }
+    
+    // Validate and set due date
+    let dueDate = null;
+    if (parsedTask.dueDate && parsedTask.dueDate !== 'Invalid Date') {
+      const dateObj = new Date(parsedTask.dueDate);
+      if (!isNaN(dateObj.getTime())) {
+        dueDate = dateObj;
+      }
+    }
+    
     // Get AI categorization
     let categorization;
     try {
@@ -349,102 +428,11 @@ router.post('/create-task',
         estimatedComplexity: 'medium'
       };
     }
-  
-    // Find assignee - use provided ID first, then try to find by name from text
-    let assignedTo = null; // Don't default to creator - require explicit assignment
-    console.log('AI Task Creation - parsedTask:', parsedTask);
-    console.log('providedAssignedTo:', providedAssignedTo);
     
-    if (providedAssignedTo) {
-      // Use the user-selected assignee
-      assignedTo = providedAssignedTo;
-      console.log('Using provided assignedTo:', assignedTo);
-    } else if (parsedTask.assignedToName) {
-      // Try to find assignee by name from AI parsing
-      // Clean up the name: trim spaces and make case-insensitive
-      const searchName = parsedTask.assignedToName.trim().toLowerCase();
-      console.log('Looking for user with cleaned name:', searchName);
-      
-      // Find all users and compare with cleaned names
-      const allUsers = await User.find({}, 'name email');
-      
-      // First try exact match
-      let assignee = allUsers.find(u =>
-        u.name.trim().toLowerCase() === searchName
-      );
-      
-      // If no exact match, try partial match (first name or partial)
-      if (!assignee) {
-        assignee = allUsers.find(u => {
-          const userNameLower = u.name.trim().toLowerCase();
-          // Check if searchName is a prefix of the user's name (e.g., "nayan" matches "Nayan Agarwal")
-          return userNameLower.startsWith(searchName + ' ') ||
-                 userNameLower === searchName ||
-                 userNameLower.includes(' ' + searchName + ' ') ||
-                 userNameLower.includes(' ' + searchName);
-        });
-      }
-      
-      console.log('Found assignee:', assignee);
-      if (assignee) {
-        assignedTo = assignee._id;
-      } else {
-        // Return error instead of defaulting to creator
-        return res.status(400).json({
-          success: false,
-          message: `User "${parsedTask.assignedToName}" not found. Please check the name or select a user from your team.`,
-          error: 'USER_NOT_FOUND'
-        });
-      }
-    }
-    
-    // Find team by name if provided and no teamId was given
-    let finalTeamId = providedTeamId;
-    if (!finalTeamId && parsedTask.teamName) {
-      const team = await Team.findOne({
-        name: { $regex: new RegExp(parsedTask.teamName.replace('team', '').trim(), 'i') }
-      });
-      if (team) {
-        finalTeamId = team._id;
-      }
-    }
-    
-    // Validate date
-    let dueDate = undefined;
-    if (parsedTask.dueDate && parsedTask.dueDate !== 'Invalid Date') {
-      const dateObj = new Date(parsedTask.dueDate);
-      if (!isNaN(dateObj.getTime())) {
-        dueDate = dateObj;
-      }
-    }
-    
-    // Validate that we have someone to assign to
-    if (!assignedTo && !finalTeamId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please specify who to assign this task to (a person or team).',
-        error: 'ASSIGNEE_REQUIRED'
-      });
-    }
-    
-    // If no assignee but team is specified, assign to creator (team task)
-    if (!assignedTo && finalTeamId) {
-      assignedTo = req.user._id;
-    }
-    
-    // Check AI service health before creating
-    const cb = req.circuitBreaker;
-    if (cb && cb.state === 'OPEN') {
-      // Still allow task creation with fallback categorization
-      categorization.category = 'general';
-      categorization.tags = ['ai-fallback'];
-      categorization.estimatedComplexity = 'medium';
-    }
-    
-    // Create the task
+    // Create the task with AI analysis
     const task = await Task.create({
       title: parsedTask.title,
-      description: parsedTask.description,
+      description: parsedTask.description || text,
       priority: parsedTask.priority || 'medium',
       category: categorization.category,
       tags: categorization.tags,
@@ -454,7 +442,9 @@ router.post('/create-task',
       createdBy: req.user._id,
       team: finalTeamId || undefined,
       aiGenerated: true,
-      aiFallback: cb?.state === 'OPEN' || parsedTask.fallback
+      aiFallback: parsedTask.fallback || req.circuitBreaker?.state === 'OPEN',
+      aiAnalysis: parsedTask.aiAnalysis || null,
+      estimatedHours: parsedTask.estimatedHours || null
     });
 
     // Get AI recommendations for team members if team task
@@ -472,8 +462,13 @@ router.post('/create-task',
       .populate('team', 'name');
 
     res.json({
+      success: true,
       task: populatedTask,
       aiInsights: {
+        parsedFrom: text,
+        detectedAssignee: parsedTask.assignedToName,
+        detectedTeam: parsedTask.teamName,
+        aiAnalysis: parsedTask.aiAnalysis,
         category: categorization.category,
         complexity: categorization.estimatedComplexity,
         recommendations

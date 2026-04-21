@@ -1,22 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import { useTeams } from '../hooks/useTeams'
+import { useNavigate } from 'react-router-dom'
 import { useAI } from '../hooks/useAI'
 import AppLayout from '../components/AppLayout'
 import AITaskCreator from '../components/AITaskCreator'
 import AIInsights from '../components/AIInsights'
 import api from '../utils/api'
-import NotificationBell from '../components/NotificationBell'
-import NotificationInfo from '../components/NotificationInfo'
 import { extractData, extractPagination } from '../utils/extractData'
 
 // Design System - Cohesive color palette
 const field =
   'w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all'
-
-const lbl =
-  'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2'
 
 const statusColors = {
   todo: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400',
@@ -30,10 +23,22 @@ const statusLabels = {
   done: 'Done'
 }
 
+const priorityColors = {
+  low: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  medium: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400',
+  high: 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400',
+  urgent: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400'
+}
+
+const importanceColors = {
+  critical: 'text-red-600 dark:text-red-400',
+  high: 'text-amber-600 dark:text-amber-400',
+  normal: 'text-slate-500 dark:text-slate-400',
+  low: 'text-slate-400 dark:text-slate-500'
+}
+
 export default function Dashboard({ dark, setDark }) {
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const { teams, memberTeams, getAllTeamMembers, canCreateTask } = useTeams()
   const { smartSearch } = useAI()
 
   const [tasks, setTasks] = useState([])
@@ -52,17 +57,7 @@ export default function Dashboard({ dark, setDark }) {
     pages: 0
   })
 
-  // form
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [status, setStatus] = useState('todo')
-  const [selectedTeam, setSelectedTeam] = useState('')
-  const [assignedTo, setAssignedTo] = useState('')
-  const [assignmentType, setAssignmentType] = useState('') // 'team' or 'individual'
-  const [showForm, setShowForm] = useState(false)
-
   const [error, setError] = useState('')
-  const [creating, setCreating] = useState(false)
 
   // ================= FETCH TASKS =================
   const fetchTasks = async () => {
@@ -101,38 +96,6 @@ export default function Dashboard({ dark, setDark }) {
     setPagination(prev => ({ ...prev, page: 1 }))
   }
 
-  const handleCreateTask = async (e) => {
-    e.preventDefault()
-    setCreating(true)
-
-    try {
-      const payload = { title, description, status }
-      
-      // Handle assignment
-      if (selectedTeam && assignmentType === 'team') {
-        payload.team = selectedTeam
-      } else if (selectedTeam && assignmentType === 'individual' && assignedTo) {
-        payload.assignedTo = assignedTo
-      }
-
-      await api.post('/api/tasks', payload)
-
-      setTitle('')
-      setDescription('')
-      setStatus('todo')
-      setSelectedTeam('')
-      setAssignedTo('')
-      setAssignmentType('')
-      setShowForm(false)
-
-      fetchTasks()
-    } catch (err) {
-      setError('Failed to create task')
-    } finally {
-      setCreating(false)
-    }
-  }
-
   const handleDeleteTask = async (id) => {
     await api.delete(`/api/tasks/${id}`)
     fetchTasks()
@@ -168,137 +131,13 @@ export default function Dashboard({ dark, setDark }) {
         </div>
       </div>
 
-      {/* TASK CREATION TOGGLE */}
+      {/* TASK LIST HEADER */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold text-slate-900 dark:text-white">Task List</h3>
-        {canCreateTask && (
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-          >
-            {showForm ? 'Cancel' : 'Create Task Manually'}
-          </button>
-        )}
+        <span className="text-sm text-slate-500 dark:text-slate-400">
+          {pagination.total} total tasks
+        </span>
       </div>
-
-      {!canCreateTask && (
-        <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-md">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Only team admins can create tasks. Contact your team admin.
-          </p>
-        </div>
-      )}
-
-      {/* FORM */}
-      {showForm && (
-        <form onSubmit={handleCreateTask} className="space-y-4 mb-6 p-6 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Create New Task</h3>
-          
-          <input
-            placeholder="Task Title"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            className={field}
-            required
-          />
-
-          <textarea
-            placeholder="Task Description"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            className={field}
-            rows={3}
-          />
-
-          <div className="space-y-2">
-            <label className={lbl}>Select Team</label>
-            <select
-              value={selectedTeam}
-              onChange={e => {
-                setSelectedTeam(e.target.value)
-                setAssignmentType('')
-                setAssignedTo('')
-              }}
-              className={field}
-            >
-              <option value="">Choose a team first</option>
-              {memberTeams.map(team => (
-                <option key={team._id} value={team._id}>
-                  {team.name} {team.members?.some(m => String(m.user?._id || m.user) === String(user._id) && m.role === 'admin') ? '(Admin)' : '(Member)'}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedTeam && (
-            <div className="space-y-2">
-              <label className={lbl}>Assignment Type</label>
-              <select
-                value={assignmentType}
-                onChange={e => {
-                  setAssignmentType(e.target.value)
-                  setAssignedTo('')
-                }}
-                className={field}
-              >
-                <option value="">Select assignment type</option>
-                <option value="team">Whole Team</option>
-                <option value="individual">Individual Member</option>
-              </select>
-            </div>
-          )}
-
-          {selectedTeam && assignmentType === 'individual' && (
-            <div className="space-y-2">
-              <label className={lbl}>Select Member</label>
-              <select
-                value={assignedTo}
-                onChange={e => setAssignedTo(e.target.value)}
-                className={field}
-              >
-                <option value="">Choose a member</option>
-                {getAllTeamMembers()
-                  .filter(m => m.teamId === selectedTeam)
-                  .map(m => (
-                    <option key={m._id} value={m._id}>
-                      {m.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className={lbl}>Status</label>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value)}
-              className={field}
-            >
-              <option value="todo">Todo</option>
-              <option value="inprogress">In Progress</option>
-              <option value="done">Done</option>
-            </select>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={creating}
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {creating ? 'Creating...' : 'Create Task'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-6 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
 
       {/* SEARCH + FILTER */}
       <div className="flex gap-3 mb-6">
@@ -335,8 +174,14 @@ export default function Dashboard({ dark, setDark }) {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                     {task.title}
+                    {task.aiGenerated && (
+                      <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded text-xs font-medium">
+                        AI
+                      </span>
+                    )}
                   </h3>
-                  <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {/* Status Badge */}
                     <span className={`px-2.5 py-0.5 rounded text-xs font-medium ${
                       task.status === 'done' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
                       task.status === 'inprogress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
@@ -346,11 +191,39 @@ export default function Dashboard({ dark, setDark }) {
                        task.status === 'inprogress' ? 'In Progress' :
                        'Todo'}
                     </span>
+                    
+                    {/* Priority Badge */}
+                    {task.priority && task.priority !== 'medium' && (
+                      <span className={`px-2.5 py-0.5 rounded text-xs font-medium ${priorityColors[task.priority] || priorityColors.medium}`}>
+                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
+                      </span>
+                    )}
+                    
+                    {/* Due Date */}
+                    {task.dueDate && (
+                      <span className={`px-2.5 py-0.5 rounded text-xs font-medium flex items-center gap-1 ${
+                        new Date(task.dueDate) < new Date() && task.status !== 'done'
+                          ? 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                      }`}>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                        {new Date(task.dueDate) < new Date() && task.status !== 'done' && (
+                          <span className="ml-1 text-red-500 font-semibold">(Overdue)</span>
+                        )}
+                      </span>
+                    )}
+                    
+                    {/* Team Badge */}
                     {task.team && (
                       <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded text-xs font-medium" title={`Team: ${typeof task.team === 'object' ? task.team.name : task.team}`}>
                         {typeof task.team === 'object' ? (task.team.name || 'Team') : 'Team'}
                       </span>
                     )}
+                    
+                    {/* Assignee Badge */}
                     {task.assignedTo && (
                       <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded text-xs font-medium">
                         {task.assignedTo.name || 'Assigned'}
@@ -374,6 +247,55 @@ export default function Dashboard({ dark, setDark }) {
                   <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
                     {task.description}
                   </p>
+                </div>
+              )}
+
+              {/* AI Analysis - Only show for AI-generated tasks */}
+              {task.aiGenerated && task.aiAnalysis && (
+                <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="text-xs font-medium text-purple-700 dark:text-purple-400">AI Insights</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    {task.aiAnalysis.estimatedHours && (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Est. <span className="font-medium">{task.aiAnalysis.estimatedHours}h</span>
+                        </span>
+                      </div>
+                    )}
+                    {task.aiAnalysis.importance && (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span className={`capitalize font-medium ${importanceColors[task.aiAnalysis.importance]}`}>
+                          {task.aiAnalysis.importance}
+                        </span>
+                      </div>
+                    )}
+                    {task.estimatedHours && (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Complex: <span className="font-medium">{task.estimatedHours}h</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {task.aiAnalysis.reasoning && (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-500 italic">
+                      "{task.aiAnalysis.reasoning}"
+                    </p>
+                  )}
                 </div>
               )}
 

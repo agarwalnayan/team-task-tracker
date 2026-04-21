@@ -116,6 +116,21 @@ const taskSchema = new mongoose.Schema({
   aiFallback: {
     type: Boolean,
     default: false
+  },
+  aiAnalysis: {
+    estimatedHours: {
+      type: Number,
+      min: 0
+    },
+    importance: {
+      type: String,
+      enum: ['critical', 'high', 'normal', 'low']
+    },
+    urgencyFactors: [{
+      type: String
+    }],
+    reasoning: String,
+    suggestedApproach: String
   }
 }, {
   timestamps: true
