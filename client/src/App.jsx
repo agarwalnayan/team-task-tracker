@@ -9,6 +9,7 @@ const Home = lazy(() => import('./pages/Home'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const TaskDetail = lazy(() => import('./pages/TaskDetail'))
 const Teams = lazy(() => import('./pages/Teams'))
+const TeamDetail = lazy(() => import('./pages/TeamDetail'))
 const Profile = lazy(() => import('./pages/Profile'))
 
 const ProtectedRoute = ({ children }) => {
@@ -62,6 +63,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <Teams dark={dark} setDark={setDark} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams/:id"
+              element={
+                <ProtectedRoute>
+                  <TeamDetail dark={dark} setDark={setDark} />
                 </ProtectedRoute>
               }
             />

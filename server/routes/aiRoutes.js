@@ -333,20 +333,60 @@ router.post('/create-task',
       };
     }
     
-    // Smart user lookup by name
+    // Smart team lookup by name first
+    let finalTeamId = null;
+    let teamMembers = [];
+    
+    if (parsedTask.teamName) {
+      const team = await Team.findOne({
+        name: { $regex: new RegExp(parsedTask.teamName.replace('team', '').trim(), 'i') }
+      }).populate('members.user', 'name email');
+      
+      if (team) {
+        finalTeamId = team._id;
+        teamMembers = team.members || [];
+        console.log(`✅ Found team: ${team.name} with ${teamMembers.length} members`);
+      }
+    }
+    
+    // If no team mentioned, check if user is member of any team
+    if (!finalTeamId) {
+      const userTeams = await Team.find({ 'members.user': req.user._id })
+        .populate('members.user', 'name email');
+      
+      if (userTeams.length > 0) {
+        // Use the first team the user belongs to
+        finalTeamId = userTeams[0]._id;
+        teamMembers = userTeams[0].members || [];
+        console.log(`✅ Using default team: ${userTeams[0].name}`);
+      }
+    }
+    
+    // Smart user lookup by name - ONLY within team members
     let assignedTo = null;
     let assigneeFound = false;
     
     if (parsedTask.assignedToName) {
       const searchName = parsedTask.assignedToName.trim().toLowerCase();
-      const allUsers = await User.find({}, 'name email');
+      
+      // Get all team member users
+      const teamMemberUsers = teamMembers.map(m => m.user).filter(Boolean);
+      
+      if (teamMemberUsers.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: `No team members found. Please join or create a team first.`,
+          error: 'NO_TEAM_MEMBERS',
+          aiParsed: { assignedToName: parsedTask.assignedToName }
+        });
+      }
       
       // Smart matching: exact match
-      let assignee = allUsers.find(u => u.name.trim().toLowerCase() === searchName);
+      let assignee = teamMemberUsers.find(u => u.name.trim().toLowerCase() === searchName);
       
       // First name match (e.g., "ashish" matches "Ashish Sha")
       if (!assignee) {
-        assignee = allUsers.find(u => {
+        assignee = teamMemberUsers.find(u => {
           const userNameLower = u.name.trim().toLowerCase();
           const firstName = userNameLower.split(' ')[0];
           return firstName === searchName;
@@ -355,7 +395,7 @@ router.post('/create-task',
       
       // Partial match: starts with or contains
       if (!assignee) {
-        assignee = allUsers.find(u => {
+        assignee = teamMemberUsers.find(u => {
           const userNameLower = u.name.trim().toLowerCase();
           return userNameLower.startsWith(searchName + ' ') ||
                  userNameLower.includes(searchName);
@@ -365,26 +405,15 @@ router.post('/create-task',
       if (assignee) {
         assignedTo = assignee._id;
         assigneeFound = true;
-        console.log(`✅ Found assignee: ${assignee.name} (ID: ${assignee._id}) for search: "${searchName}"`);
+        console.log(`✅ Found assignee in team: ${assignee.name} (ID: ${assignee._id}) for search: "${searchName}"`);
       } else {
-        console.log(`❌ User not found for: "${searchName}"`);
+        console.log(`❌ Team member not found for: "${searchName}"`);
         return res.status(400).json({
           success: false,
-          message: `User "${parsedTask.assignedToName}" not found. Available users: ${allUsers.map(u => u.name).join(', ')}`,
-          error: 'USER_NOT_FOUND',
+          message: `Team member "${parsedTask.assignedToName}" not found in this team. Available members: ${teamMemberUsers.map(u => u.name).join(', ')}`,
+          error: 'MEMBER_NOT_FOUND',
           aiParsed: { assignedToName: parsedTask.assignedToName }
         });
-      }
-    }
-    
-    // Smart team lookup by name
-    let finalTeamId = null;
-    if (parsedTask.teamName) {
-      const team = await Team.findOne({
-        name: { $regex: new RegExp(parsedTask.teamName.replace('team', '').trim(), 'i') }
-      });
-      if (team) {
-        finalTeamId = team._id;
       }
     }
     

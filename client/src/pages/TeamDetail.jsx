@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AppLayout from '../components/AppLayout'
 import api from '../utils/api'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format } from 'date-fns'
 
 export default function TeamDetail({ dark, setDark }) {
   const { id } = useParams()
@@ -50,9 +50,9 @@ export default function TeamDetail({ dark, setDark }) {
 
   const isTeamAdmin = team?.members?.some(
     m => String(m.user?._id || m.user) === String(user?._id) && m.role === 'admin'
-  )
+  ) || false
 
-  const isTeamCreator = String(team.createdBy?._id || team.createdBy) === String(user?._id)
+  const isTeamCreator = team ? String(team.createdBy?._id || team.createdBy) === String(user?._id) : false
 
   // Fetch team details
   const fetchTeam = async () => {
@@ -212,9 +212,22 @@ export default function TeamDetail({ dark, setDark }) {
     )
   }
 
+  // Show loading state
+  if (loading) {
+    return (
+      <AppLayout dark={dark} setDark={setDark} backTo="/teams" backLabel="All Teams" title="Loading...">
+        <div className="flex items-center justify-center py-20">
+          <div className="w-10 h-10 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="ml-3 text-slate-600 dark:text-slate-400">Loading team details...</p>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  // Show team not found only after loading is complete
   if (!team) {
     return (
-      <AppLayout title="Team not found" backTo="/teams">
+      <AppLayout dark={dark} setDark={setDark} backTo="/teams" backLabel="All Teams" title="Team not found">
         <div className="text-center py-20">
           <p className="text-slate-600 dark:text-slate-400">Team not found</p>
           <Link to="/teams" className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
@@ -231,8 +244,8 @@ export default function TeamDetail({ dark, setDark }) {
       setDark={setDark}
       backTo="/teams"
       backLabel="All Teams"
-      title={team.name}
-      subtitle={`${team.members?.length || 0} members`}
+      title={team?.name || 'Loading...'}
+      subtitle={team ? `${team.members?.length || 0} members` : ''}
     >
       {error && (
         <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50">
@@ -286,7 +299,8 @@ export default function TeamDetail({ dark, setDark }) {
               </div>
             )}
 
-            <div className="grid md:grid-cols-3 gap-6">
+            {/* Team Stats Grid */}
+            <div className="grid md:grid-cols-4 gap-4 mb-6">
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
@@ -315,12 +329,55 @@ export default function TeamDetail({ dark, setDark }) {
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
                     <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Created</span>
+                </div>
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  {team.createdAt ? format(new Date(team.createdAt), 'MMM d, yyyy') : 'Unknown'}
+                </p>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
                   <span className="text-sm text-slate-600 dark:text-slate-400">Company</span>
                 </div>
                 <p className="font-semibold text-slate-900 dark:text-white">{team.company || 'Not specified'}</p>
+              </div>
+            </div>
+
+            {/* Task Statistics */}
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-indigo-100 dark:border-indigo-800/50">
+              <h3 className="text-sm font-medium text-indigo-900 dark:text-indigo-200 mb-3">📊 Task Statistics</h3>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{teamTasks.length}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Total Tasks</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                    {teamTasks.filter(t => t.status === 'todo').length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Todo</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {teamTasks.filter(t => t.status === 'inprogress').length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">In Progress</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    {teamTasks.filter(t => t.status === 'done').length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Completed</p>
+                </div>
               </div>
             </div>
           </div>
@@ -443,9 +500,19 @@ export default function TeamDetail({ dark, setDark }) {
 
         {/* Team Members */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl p-8">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-            👥 Team Members ({team.members?.length || 0})
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+              👥 Team Members ({team.members?.length || 0})
+            </h2>
+            <div className="flex gap-3 text-sm">
+              <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-full">
+                {team.members?.filter(m => m.role === 'admin').length || 0} Admins
+              </span>
+              <span className="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full">
+                {team.members?.filter(m => m.role === 'member').length || 0} Members
+              </span>
+            </div>
+          </div>
           
           <div className="grid gap-4">
             {team?.members?.map(member => (
@@ -550,7 +617,8 @@ export default function TeamDetail({ dark, setDark }) {
                         <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">
                           {task.description || 'No description'}
                         </p>
-                        <div className="flex items-center gap-3 mt-2">
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {/* Status Badge */}
                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                             task.status === 'done' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
                             task.status === 'inprogress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
@@ -560,14 +628,41 @@ export default function TeamDetail({ dark, setDark }) {
                              task.status === 'inprogress' ? 'In Progress' :
                              'Todo'}
                           </span>
-                          {task.assignedTo && (
-                            <span className="text-xs text-slate-500">
-                              Assigned to: {task.assignedTo.name}
+                          
+                          {/* Priority Badge */}
+                          {task.priority && (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                              task.priority === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                              'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            }`}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                             </span>
                           )}
-                          <span className="text-xs text-slate-400">
-                            {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
-                          </span>
+                          
+                          {/* Due Date Badge */}
+                          {task.dueDate && (
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              new Date(task.dueDate) < new Date() && task.status !== 'done'
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                            }`}>
+                              Due: {format(new Date(task.dueDate), 'MMM d')}
+                            </span>
+                          )}
+                          
+                          {/* AI Badge */}
+                          {task.aiAnalysis && (
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                              🤖 AI
+                            </span>
+                          )}
+                          
+                          {task.assignedTo && (
+                            <span className="text-xs text-slate-500">
+                              @{task.assignedTo.name?.split(' ')[0]}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
