@@ -1,7 +1,24 @@
 const Team = require('../models/Team')
 const User = require('../models/User')
 const Task = require('../models/Task')
+const Notification = require('../models/Notification')
 const { asyncHandler } = require('../middleware/errorHandler')
+
+// Helper to create notification and emit socket event
+const createNotification = async (req, notificationData) => {
+  try {
+    const io = req.app.get('io')
+    const notification = await Notification.create(notificationData)
+    const populated = await Notification.findById(notification._id)
+      .populate('triggeredBy', 'name email')
+    io.emit(`notification:${notificationData.user}`, populated)
+    io.emit('notification:new', populated)
+    return notification
+  } catch (error) {
+    console.error('Error creating notification:', error.message)
+    // Don't throw - notifications shouldn't break main functionality
+  }
+}
 
 const createTeam = asyncHandler(async (req, res) => {
   const { name, description, company } = req.body
@@ -114,6 +131,18 @@ const addMember = asyncHandler(async (req, res) => {
   })
 
   await team.save()
+
+  // Notify the added user
+  await createNotification(req, {
+    user: userToAdd._id,
+    type: 'team_invite',
+    title: 'Added to Team',
+    message: `You have been added to the team "${team.name}" by ${req.user.name}`,
+    link: `/teams`,
+    relatedTeam: team._id,
+    triggeredBy: req.user._id
+  })
+
   const populated = await Team.findById(team._id)
     .populate('createdBy', 'name email company')
     .populate('members.user', 'name email company')
@@ -135,11 +164,27 @@ const removeMember = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'Only admins can remove members' })
   }
 
+  const removedMember = team.members.find(m => m.user.toString() === req.params.userId)
+
   team.members = team.members.filter(
     m => m.user.toString() !== req.params.userId
   )
 
   await team.save()
+
+  // Notify the removed user
+  if (removedMember) {
+    await createNotification(req, {
+      user: removedMember.user,
+      type: 'team_invite',
+      title: 'Removed from Team',
+      message: `You have been removed from the team "${team.name}" by ${req.user.name}`,
+      link: `/teams`,
+      relatedTeam: team._id,
+      triggeredBy: req.user._id
+    })
+  }
+
   const populated = await Team.findById(team._id)
     .populate('createdBy', 'name email company')
     .populate('members.user', 'name email company')
@@ -181,6 +226,22 @@ const joinByRoomCode = asyncHandler(async (req, res) => {
   })
 
   await team.save()
+
+  // Notify team admins
+  const adminMembers = team.members.filter(m => m.role === 'admin')
+  for (const admin of adminMembers) {
+    if (admin.user.toString() !== req.user._id.toString()) {
+      await createNotification(req, {
+        user: admin.user,
+        type: 'team_invite',
+        title: 'New Member Joined',
+        message: `${req.user.name} joined the team "${team.name}" using room code`,
+        link: `/teams`,
+        relatedTeam: team._id,
+        triggeredBy: req.user._id
+      })
+    }
+  }
 
   // Return updated team
   const updatedTeam = await Team.findById(team._id)
@@ -234,6 +295,17 @@ const updateMemberRole = asyncHandler(async (req, res) => {
   memberToUpdate.canManageRoles = canManageRoles || false
 
   await team.save()
+
+  // Notify the user whose role was updated
+  await createNotification(req, {
+    user: memberToUpdate.user,
+    type: 'team_invite',
+    title: 'Role Updated',
+    message: `Your role in "${team.name}" was updated to ${role} by ${req.user.name}`,
+    link: `/teams`,
+    relatedTeam: team._id,
+    triggeredBy: req.user._id
+  })
 
   const updatedTeam = await Team.findById(team._id)
     .populate('createdBy', 'name email')
@@ -325,6 +397,21 @@ const deleteTeam = asyncHandler(async (req, res) => {
 
   if (!isAdmin || team.createdBy.toString() !== req.user._id.toString()) {
     return res.status(403).json({ message: 'Only team creators can delete teams' })
+  }
+
+  // Notify all team members before deletion
+  const memberIds = team.members.map(m => m.user.toString())
+  const uniqueMemberIds = [...new Set(memberIds)].filter(id => id !== req.user._id.toString())
+
+  for (const memberId of uniqueMemberIds) {
+    await createNotification(req, {
+      user: memberId,
+      type: 'team_invite',
+      title: 'Team Deleted',
+      message: `The team "${team.name}" has been deleted by ${req.user.name}`,
+      link: `/teams`,
+      triggeredBy: req.user._id
+    })
   }
 
   // Delete all tasks associated with this team

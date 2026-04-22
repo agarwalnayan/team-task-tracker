@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { useSocket } from './useSocket';
+import { useAuth } from '../context/AuthContext';
 import { extractData } from '../utils/extractData';
 
 export const useNotifications = () => {
@@ -8,11 +9,13 @@ export const useNotifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const socket = useSocket();
+  const { user } = useAuth();
+  const currentUserId = user?._id;
 
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/notifications?limit=50');
+      const response = await api.get(`/api/notifications?limit=50&userId=${currentUserId}`);
       setNotifications(extractData(response));
       setUnreadCount(response.pagination?.unreadCount || 0);
     } catch (error) {
@@ -20,26 +23,37 @@ export const useNotifications = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !currentUserId) return;
 
     const handleNewNotification = (notification) => {
+      // Only add notification if it's for the current user
+      if (notification.user === currentUserId || notification.user?._id === currentUserId) {
+        setNotifications(prev => [notification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      }
+    };
+
+    // Listen for user-specific notifications
+    const handleUserNotification = (notification) => {
       setNotifications(prev => [notification, ...prev]);
       setUnreadCount(prev => prev + 1);
     };
 
     socket.on('notification:new', handleNewNotification);
+    socket.on(`notification:${currentUserId}`, handleUserNotification);
 
     return () => {
       socket.off('notification:new', handleNewNotification);
+      socket.off(`notification:${currentUserId}`, handleUserNotification);
     };
-  }, [socket]);
+  }, [socket, currentUserId]);
 
   const markAsRead = async (notificationId) => {
     try {

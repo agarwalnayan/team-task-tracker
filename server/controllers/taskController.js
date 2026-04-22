@@ -4,6 +4,21 @@ const ActivityLog = require('../models/Activity');
 const { AppError, asyncHandler } = require('../middleware/errorHandler');
 const ApiResponse = require('../utils/response');
 
+// Helper to create notification and emit socket event
+const createNotification = async (io, notificationData) => {
+  try {
+    const notification = await Notification.create(notificationData);
+    const populated = await Notification.findById(notification._id)
+      .populate('triggeredBy', 'name email');
+    io.emit(`notification:${notificationData.user}`, populated);
+    io.emit('notification:new', populated);
+    return notification;
+  } catch (error) {
+    console.error('Error creating notification:', error.message);
+    // Don't throw - notifications shouldn't break main functionality
+  }
+};
+
 // Get all tasks with pagination, filtering, and search
 exports.getTasks = asyncHandler(async (req, res, next) => {
   const {
@@ -81,7 +96,7 @@ exports.createTask = asyncHandler(async (req, res, next) => {
 
   // Create notification if task is assigned
   if (task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
-    await Notification.create({
+    await createNotification(req.app.get('io'), {
       user: task.assignedTo,
       type: 'task_assigned',
       title: 'New Task Assigned',
@@ -127,14 +142,19 @@ exports.updateTask = asyncHandler(async (req, res, next) => {
   }
 
   const oldAssignee = task.assignedTo;
+  const oldStatus = task.status;
+  const oldTask = { ...task.toObject() };
+  
   task = await Task.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true
   }).populate('assignedTo createdBy team');
 
+  const io = req.app.get('io');
+
   // Create notification if assignee changed
   if (req.body.assignedTo && oldAssignee?.toString() !== req.body.assignedTo) {
-    await Notification.create({
+    await createNotification(io, {
       user: req.body.assignedTo,
       type: 'task_assigned',
       title: 'Task Assigned',
@@ -143,6 +163,42 @@ exports.updateTask = asyncHandler(async (req, res, next) => {
       relatedTask: task._id,
       triggeredBy: req.user._id
     });
+  }
+
+  // Notify about status change
+  if (req.body.status && req.body.status !== oldStatus) {
+    const notifyUsers = [task.createdBy, task.assignedTo].filter(Boolean).map(u => u._id?.toString() || u.toString());
+    const uniqueUsers = [...new Set(notifyUsers)].filter(id => id !== req.user._id.toString());
+    
+    for (const userId of uniqueUsers) {
+      await createNotification(io, {
+        user: userId,
+        type: 'task_updated',
+        title: 'Task Status Updated',
+        message: `${task.title} status changed from ${oldStatus} to ${req.body.status}`,
+        link: `/tasks/${task._id}`,
+        relatedTask: task._id,
+        triggeredBy: req.user._id
+      });
+    }
+  }
+
+  // Notify creator/assignee of other updates (not status/assignee changes which are handled above)
+  if (req.body.title || req.body.description || req.body.priority || req.body.dueDate) {
+    const notifyUsers = [task.createdBy, task.assignedTo].filter(Boolean).map(u => u._id?.toString() || u.toString());
+    const uniqueUsers = [...new Set(notifyUsers)].filter(id => id !== req.user._id.toString());
+    
+    for (const userId of uniqueUsers) {
+      await createNotification(io, {
+        user: userId,
+        type: 'task_updated',
+        title: 'Task Updated',
+        message: `${req.user.name} updated the task: ${task.title}`,
+        link: `/tasks/${task._id}`,
+        relatedTask: task._id,
+        triggeredBy: req.user._id
+      });
+    }
   }
 
   // Log activity
