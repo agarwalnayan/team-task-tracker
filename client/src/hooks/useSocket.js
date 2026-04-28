@@ -11,18 +11,22 @@ export const useSocket = () => {
     if (!token) return;
 
     if (!socket) {
-      socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000', {
-        auth: { token }
+      const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+      socket = io(socketUrl, {
+        auth: { token },
+        transports: ['websocket', 'polling']
       });
 
       socket.on('connect', () => {
-        console.log('Socket connected');
         setIsConnected(true);
       });
 
       socket.on('disconnect', () => {
-        console.log('Socket disconnected');
         setIsConnected(false);
+      });
+
+      socket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err.message);
       });
     }
 

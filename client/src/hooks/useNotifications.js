@@ -33,14 +33,13 @@ export const useNotifications = () => {
     if (!socket || !currentUserId) return;
 
     const handleNewNotification = (notification) => {
-      // Only add notification if it's for the current user
-      if (notification.user === currentUserId || notification.user?._id === currentUserId) {
+      const notifUserId = notification.user?._id || notification.user;
+      if (notifUserId === currentUserId) {
         setNotifications(prev => [notification, ...prev]);
         setUnreadCount(prev => prev + 1);
       }
     };
 
-    // Listen for user-specific notifications
     const handleUserNotification = (notification) => {
       setNotifications(prev => [notification, ...prev]);
       setUnreadCount(prev => prev + 1);

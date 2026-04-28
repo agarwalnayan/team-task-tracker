@@ -10,7 +10,9 @@ const createNotification = async (io, notificationData) => {
     const notification = await Notification.create(notificationData);
     const populated = await Notification.findById(notification._id)
       .populate('triggeredBy', 'name email');
-    io.emit(`notification:${notificationData.user}`, populated);
+    // Convert userId to string for socket event name matching
+    const userIdStr = notificationData.user.toString();
+    io.emit(`notification:${userIdStr}`, populated);
     io.emit('notification:new', populated);
     return notification;
   } catch (error) {
@@ -94,7 +96,7 @@ exports.createTask = asyncHandler(async (req, res, next) => {
 
   const task = await Task.create(taskData);
 
-  // Create notification if task is assigned
+  // Create notification if task is assigned to someone else
   if (task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
     await createNotification(req.app.get('io'), {
       user: task.assignedTo,

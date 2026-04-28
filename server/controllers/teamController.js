@@ -11,7 +11,7 @@ const createNotification = async (req, notificationData) => {
     const notification = await Notification.create(notificationData)
     const populated = await Notification.findById(notification._id)
       .populate('triggeredBy', 'name email')
-    io.emit(`notification:${notificationData.user}`, populated)
+    io.emit(`notification:${notificationData.user.toString()}`, populated)
     io.emit('notification:new', populated)
     return notification
   } catch (error) {
